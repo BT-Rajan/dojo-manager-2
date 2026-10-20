@@ -52,6 +52,9 @@ async def test_branch_isolation(branches, promenade_admin, owner):
     assert [b["name"] for b in r.json()] == ["Promenade"]
     assert (await promenade_admin.get(f"/api/branches/{branches['bedaya']}")).status_code == 403
     assert len((await owner.get("/api/branches")).json()) == 2
+    directory = (await promenade_admin.get("/api/branches/directory")).json()
+    assert [b["code"] for b in directory] == ["BDY", "PRM"]
+    assert set(directory[0]) == {"id", "name", "code"}
 
 
 async def test_only_owner_manages_users_and_branches(promenade_admin, owner, branches):

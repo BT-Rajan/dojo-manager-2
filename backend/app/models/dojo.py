@@ -139,7 +139,7 @@ class Member(TimestampMixin, Base):
     guardian_phone: Mapped[str | None] = mapped_column(String(30))
     emergency_contact_name: Mapped[str | None] = mapped_column(String(150))
     emergency_contact_phone: Mapped[str | None] = mapped_column(String(30))
-    medical_notes: Mapped[str | None] = mapped_column(Text)
+    health_notes: Mapped[str | None] = mapped_column(Text)
     media_consent: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     belt_rank_id: Mapped[int | None] = mapped_column(ForeignKey("belt_ranks.id"))
     stripes: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")

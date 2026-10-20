@@ -32,6 +32,12 @@ class BranchUpdate(InModel):
     is_active: bool | None = None
 
 
+class BranchRef(OutModel):
+    id: int
+    name: str
+    code: str
+
+
 class BranchOut(OutModel):
     id: int
     name: str

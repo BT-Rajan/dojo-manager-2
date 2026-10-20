@@ -12,7 +12,7 @@ from app.core.deps import (
     require_roles,
 )
 from app.models.org import Branch, Role
-from app.schemas.org import BranchIn, BranchOut, BranchUpdate
+from app.schemas.org import BranchIn, BranchOut, BranchRef, BranchUpdate
 
 router = APIRouter(prefix="/branches", tags=["branches"], dependencies=[require_roles(*ANY_ROLE)])
 
@@ -23,6 +23,13 @@ async def list_branches(user: CurrentUser, db: DB) -> list[Branch]:
     stmt = select(Branch).order_by(Branch.name)
     if not user.sees_all_branches:
         stmt = stmt.where(Branch.id.in_(user.branch_ids or [-1]))
+    return list(await db.scalars(stmt))
+
+
+@router.get("/directory", response_model=list[BranchRef])
+async def branch_directory(db: DB) -> list[Branch]:
+    """Names of all active branches (e.g. to pick a transfer destination). No branch data."""
+    stmt = select(Branch).where(Branch.is_active.is_(True)).order_by(Branch.name)
     return list(await db.scalars(stmt))
 
 

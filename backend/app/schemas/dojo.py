@@ -134,7 +134,7 @@ class _MemberFields(InModel):
     guardian_phone: Phone | None = None
     emergency_contact_name: Name | None = None
     emergency_contact_phone: Phone | None = None
-    medical_notes: LongText | None = None
+    health_notes: LongText | None = None
     media_consent: bool = False
     belt_rank_id: int | None = None
     stripes: Annotated[int, Field(ge=0, le=4)] = 0
@@ -165,7 +165,7 @@ class MemberUpdate(InModel):
     guardian_phone: Phone | None = None
     emergency_contact_name: Name | None = None
     emergency_contact_phone: Phone | None = None
-    medical_notes: LongText | None = None
+    health_notes: LongText | None = None
     media_consent: bool | None = None
     belt_rank_id: int | None = None
     stripes: Annotated[int, Field(ge=0, le=4)] | None = None
@@ -188,7 +188,7 @@ class MemberOut(OutModel):
     guardian_phone: str | None
     emergency_contact_name: str | None
     emergency_contact_phone: str | None
-    medical_notes: str | None
+    health_notes: str | None
     media_consent: bool
     belt_rank_id: int | None
     belt_rank: BeltOut | None

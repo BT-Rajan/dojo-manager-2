@@ -122,7 +122,7 @@ def upgrade() -> None:
         sa.Column("guardian_phone", sa.String(length=30), nullable=True),
         sa.Column("emergency_contact_name", sa.String(length=150), nullable=True),
         sa.Column("emergency_contact_phone", sa.String(length=30), nullable=True),
-        sa.Column("medical_notes", sa.Text(), nullable=True),
+        sa.Column("health_notes", sa.Text(), nullable=True),
         sa.Column("media_consent", sa.Boolean(), server_default="0", nullable=False),
         sa.Column("belt_rank_id", sa.Integer(), nullable=True),
         sa.Column("stripes", sa.SmallInteger(), server_default="0", nullable=False),
