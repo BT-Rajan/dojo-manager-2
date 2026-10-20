@@ -5,8 +5,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
-from app.api import auth, branches, users
+from app.api import (
+    auth,
+    branches,
+    catalog,
+    instructors,
+    members,
+    memberships,
+    payments,
+    users,
+)
 from app.core.config import get_settings
 from app.core.db import dispose_engine, get_sessionmaker
 
@@ -56,6 +66,11 @@ def create_app() -> FastAPI:
             response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
         return response
 
+    @app.exception_handler(IntegrityError)
+    async def integrity_error(_: Request, __: IntegrityError) -> JSONResponse:
+        # Unique/foreign-key violations; never echo the database message to clients.
+        return JSONResponse({"detail": "Conflicts with existing data"}, status_code=409)
+
     app.add_middleware(GZipMiddleware, minimum_size=1024)
     app.add_middleware(
         CORSMiddleware,
@@ -66,7 +81,7 @@ def create_app() -> FastAPI:
     )
 
     api = APIRouter(prefix="/api")
-    for module in (auth, branches, users):
+    for module in (auth, branches, users, catalog, instructors, members, memberships, payments):
         api.include_router(module.router)
 
     @api.get("/health", tags=["meta"])

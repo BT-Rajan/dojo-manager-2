@@ -102,3 +102,20 @@ class Pagination:
 
 
 Page = Annotated[Pagination, Depends()]
+
+
+async def ensure_exists(db: AsyncSession, model: type, obj_id: int | None, field: str) -> None:
+    """Validate a foreign key from a request body (422 rather than a database error)."""
+    if obj_id is not None and await db.get(model, obj_id) is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Unknown {field}")
+
+
+def apply_updates(obj: Any, data: dict[str, Any]) -> None:
+    for k, v in data.items():
+        setattr(obj, k, v)
+
+
+def like_pattern(term: str) -> str:
+    """Escape LIKE wildcards in user input and return a prefix pattern."""
+    escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"{escaped}%"
