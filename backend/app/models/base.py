@@ -1,5 +1,5 @@
 import enum
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, Enum, MetaData, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -18,14 +18,22 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
+def utcnow() -> datetime:
+    """Naive UTC timestamp (MySQL DATETIME has no time zone)."""
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
 class TimestampMixin:
+    # Set in Python so values are known after INSERT/UPDATE without a re-select; the server
+    # default covers rows written outside the ORM. Connections run with time_zone = UTC.
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.current_timestamp(), nullable=False
+        DateTime, default=utcnow, server_default=func.current_timestamp(), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
+        default=utcnow,
+        onupdate=utcnow,
         server_default=func.current_timestamp(),
-        onupdate=func.current_timestamp(),
         nullable=False,
     )
 

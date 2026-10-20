@@ -1,5 +1,4 @@
 from collections.abc import Iterable
-from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException, Query, Request, status
@@ -10,14 +9,10 @@ from sqlalchemy.orm import InstrumentedAttribute
 from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.security import hash_token
+from app.models.base import utcnow
 from app.models.org import Role, User, UserSession
 
 DB = Annotated[AsyncSession, Depends(get_db)]
-
-
-def utcnow() -> datetime:
-    """Naive UTC timestamp (MySQL DATETIME has no time zone)."""
-    return datetime.now(UTC).replace(tzinfo=None)
 
 
 async def get_current_user(request: Request, db: DB) -> User:

@@ -1,6 +1,18 @@
 """Import every model module so ``Base.metadata`` is complete (used by Alembic and tests)."""
 
 from app.models.base import Base
+from app.models.classes import (
+    Attendance,
+    AttendanceStatus,
+    ClassSchedule,
+    ClassSession,
+    InstructorLeave,
+    Lead,
+    LeadSource,
+    LeadStatus,
+    LeaveType,
+    SessionStatus,
+)
 from app.models.dojo import (
     BeltPhase,
     BeltRank,
@@ -20,6 +32,16 @@ from app.models.dojo import (
 from app.models.org import AuditLog, Branch, Role, User, UserSession, user_branches
 
 __all__ = [
+    "Attendance",
+    "AttendanceStatus",
+    "ClassSchedule",
+    "ClassSession",
+    "InstructorLeave",
+    "Lead",
+    "LeadSource",
+    "LeadStatus",
+    "LeaveType",
+    "SessionStatus",
     "AuditLog",
     "Base",
     "BeltPhase",

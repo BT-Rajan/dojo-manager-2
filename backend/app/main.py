@@ -11,7 +11,9 @@ from app.api import (
     auth,
     branches,
     catalog,
+    classes,
     instructors,
+    leads,
     members,
     memberships,
     payments,
@@ -81,7 +83,19 @@ def create_app() -> FastAPI:
     )
 
     api = APIRouter(prefix="/api")
-    for module in (auth, branches, users, catalog, instructors, members, memberships, payments):
+    modules = (
+        auth,
+        branches,
+        users,
+        catalog,
+        instructors,
+        members,
+        memberships,
+        payments,
+        classes,
+        leads,
+    )
+    for module in modules:
         api.include_router(module.router)
 
     @api.get("/health", tags=["meta"])

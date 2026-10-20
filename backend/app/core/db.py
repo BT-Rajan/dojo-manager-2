@@ -24,6 +24,7 @@ def get_engine() -> AsyncEngine:
             pool_recycle=s.db_pool_recycle,
             pool_pre_ping=True,
             echo=s.db_echo,
+            connect_args={"init_command": "SET time_zone = '+00:00'"},
         )
         _sessionmaker = async_sessionmaker(_engine, expire_on_commit=False, autoflush=False)
     return _engine
