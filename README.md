@@ -62,7 +62,23 @@ gradings and seminars, front-desk operations, and inventory.
 
 ## Running locally
 
-Requirements: Python 3.12+, Node 22, MySQL 8.
+Requirements: Python 3.12+, Node 22, MySQL 8 (running), and the `mysql` client.
+
+```bash
+./runonce.sh   # one-time setup; safe to re-run
+./start.sh     # API on :8000, web app on http://localhost:5173
+./stop.sh
+```
+
+`runonce.sh` creates the database and user (as MySQL `root` over the local socket, or set
+`MYSQL_ROOT_PASSWORD`), writes `backend/.env` with a generated database password
+(permissions 600), installs dependencies, runs migrations, loads the academy's reference data
+and asks for the first `owner` password (or reads `DOJO_BOOTSTRAP_OWNER_PASSWORD`). On later
+runs it keeps the existing `.env` and only does what is missing. `start.sh` applies any new
+migrations, starts both servers in the background, waits until they answer and writes logs
+and process ids to `.run/`; ports can be changed with `API_PORT` / `WEB_PORT`.
+
+### Manual setup
 
 ```bash
 # Database
