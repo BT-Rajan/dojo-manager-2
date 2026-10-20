@@ -55,13 +55,13 @@ export default function Dashboard() {
           title="Open incidents"
           value={data?.open_incidents ?? "—"}
           icon={AlertTriangle}
-          tone="text-red-500"
+          tone="text-destructive"
         />
         <StatCard
           title="Open complaints"
           value={data?.open_complaints ?? "—"}
           icon={MessageSquareWarning}
-          tone="text-red-500"
+          tone="text-destructive"
         />
         <StatCard title="Low stock items" value={data?.low_stock_items ?? "—"} icon={Package} tone="text-warning" />
         {data?.revenue_today !== undefined && (
@@ -141,13 +141,13 @@ export default function Dashboard() {
                           <Link href={`/members/${m.member_id}`} className="text-brand hover:underline">
                             {m.member?.first_name} {m.member?.last_name}
                           </Link>
-                          <div className="text-xs text-gray-500">{m.member?.phone}</div>
+                          <div className="text-xs text-muted-foreground">{m.member?.phone}</div>
                         </TableCell>
                         <TableCell>{m.plan.name}</TableCell>
                         <TableCell>{fmtDate(m.end_date)}</TableCell>
                         <TableCell>
                           <StatusBadge status={m.is_expired ? "expired" : "active"} />
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-muted-foreground">
                             {m.is_expired ? `${-m.days_left} days ago` : `${m.days_left} days left`}
                           </div>
                         </TableCell>

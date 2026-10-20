@@ -26,25 +26,25 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <Header />
       <main className="max-w-5xl mx-auto px-4 py-10">
-        <h2 className="text-2xl font-bold text-gray-900 mb-1">Welcome, {user?.full_name}</h2>
-        <p className="text-gray-500 mb-8">Choose the branch you are working at.</p>
+        <h2 className="text-2xl font-bold text-foreground mb-1">Welcome, {user?.full_name}</h2>
+        <p className="text-muted-foreground mb-8">Choose the branch you are working at.</p>
         {active.length === 0 ? (
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             You are not assigned to any branch yet. Ask the academy owner to give you access.
           </p>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {active.map((b) => (
               <button key={b.id} onClick={() => choose(b.id)} className="text-left">
-                <Card className={`card-hover ${b.id === branchId ? "ring-2 ring-[var(--brand)]" : ""}`}>
+                <Card className={`card-hover ${b.id === branchId ? "ring-2 ring-brand" : ""}`}>
                   <CardContent className="p-6 flex items-start gap-4">
                     <Building2 className="h-10 w-10 text-brand" />
                     <div>
-                      <p className="text-lg font-semibold text-gray-900">{b.name}</p>
-                      <p className="text-sm text-gray-500 flex items-center gap-1">
+                      <p className="text-lg font-semibold text-foreground">{b.name}</p>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1">
                         <MapPin className="h-3 w-3" /> {b.address ?? b.code}
                       </p>
                     </div>

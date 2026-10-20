@@ -19,10 +19,10 @@ import Operations from "@/pages/operations";
 import Reports from "@/pages/reports";
 
 const LoadingScreen = () => (
-  <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-teal-50 to-indigo-100">
+  <div className="flex items-center justify-center min-h-screen bg-background">
     <div className="text-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
-      <p className="text-gray-600">Loading...</p>
+      <div className="animate-spin rounded-full h-10 w-10 border-2 border-muted border-t-primary mx-auto mb-4" />
+      <p className="text-muted-foreground">Loading...</p>
     </div>
   </div>
 );

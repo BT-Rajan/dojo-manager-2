@@ -93,7 +93,7 @@ export default function Reports() {
                     <TableCell>{label(m.measure)}</TableCell>
                     <TableCell className="text-right">{m.this_week}</TableCell>
                     <TableCell className="text-right">{m.last_week}</TableCell>
-                    <TableCell className={`text-right ${m.change > 0 ? "text-green-700" : m.change < 0 ? "text-red-600" : ""}`}>
+                    <TableCell className={`text-right ${m.change > 0 ? "text-success" : m.change < 0 ? "text-destructive" : ""}`}>
                       {m.change > 0 ? `+${m.change}` : m.change}
                     </TableCell>
                   </TableRow>
@@ -191,7 +191,7 @@ export default function Reports() {
                     <TableCell className="text-right">{a.attendances}</TableCell>
                     <TableCell className="text-right">{a.average_class_size}</TableCell>
                     <TableCell>
-                      <div className="h-2 rounded bg-gray-100" aria-hidden>
+                      <div className="h-2 rounded bg-muted" aria-hidden>
                         <div className="h-2 rounded bg-brand" style={{ width: `${(a.attendances / maxAtt) * 100}%` }} />
                       </div>
                     </TableCell>

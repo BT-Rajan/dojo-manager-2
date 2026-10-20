@@ -56,10 +56,10 @@ function AttendanceDialog({ session, onClose }: { session: ClassSession; onClose
         </DialogTitle>
       </DialogHeader>
       {cancelled ? (
-        <p className="text-sm text-red-700">Cancelled: {session.change_reason}</p>
+        <p className="text-sm text-destructive">Cancelled: {session.change_reason}</p>
       ) : (
         <>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             {rows.filter((r) => ["booked", "present", "late"].includes(r.status)).length} / {session.capacity} places taken
           </p>
           <div className="flex gap-2">
@@ -70,7 +70,7 @@ function AttendanceDialog({ session, onClose }: { session: ClassSession; onClose
             .map((m) => (
               <div key={m.id} className="flex items-center justify-between text-sm border rounded p-2">
                 <span>
-                  {m.full_name} <span className="text-gray-400">{m.phone}</span>
+                  {m.full_name} <span className="text-muted-foreground/70">{m.phone}</span>
                 </span>
                 <span className="flex gap-2">
                   <Button size="sm" variant="outline" onClick={() => record.mutate([{ member_id: m.id, status: "booked" }])}>
@@ -105,7 +105,7 @@ function AttendanceDialog({ session, onClose }: { session: ClassSession; onClose
                   {r.has_active_membership ? (
                     <StatusBadge status="active" />
                   ) : (
-                    <span className="text-xs text-red-700">Not covered on this date</span>
+                    <span className="text-xs text-destructive">Not covered on this date</span>
                   )}
                 </TableCell>
                 <TableCell>
@@ -192,7 +192,7 @@ function SessionsTab() {
                   <button
                     key={s.id}
                     onClick={() => setSelected(s)}
-                    className={`w-full text-left rounded border p-2 hover:bg-gray-50 ${s.status === "cancelled" ? "opacity-60" : ""}`}
+                    className={`w-full text-left rounded border p-2 hover:bg-muted/50 ${s.status === "cancelled" ? "opacity-60" : ""}`}
                   >
                     <div className="flex justify-between text-sm font-medium">
                       <span>
@@ -200,11 +200,11 @@ function SessionsTab() {
                       </span>
                       {s.status !== "scheduled" && <StatusBadge status={s.status} />}
                     </div>
-                    <div className="flex justify-between text-xs text-gray-500">
+                    <div className="flex justify-between text-xs text-muted-foreground">
                       <span>
                         {s.instructor_id ? instructorMap.get(s.instructor_id)?.full_name : "No instructor"}
                         {s.original_instructor_id && (
-                          <span className="text-amber-700">
+                          <span className="text-warning">
                             {" "}
                             (covering {instructorMap.get(s.original_instructor_id)?.full_name ?? "instructor on leave"})
                           </span>
@@ -285,11 +285,11 @@ function TimetableTab() {
                     <div key={s.id} className="flex justify-between items-center">
                       <span>
                         {fmtTime(s.start_time)}–{fmtTime(s.end_time)} {programMap.get(s.program_id)?.name}
-                        <span className="text-gray-400"> {s.instructor_id ? instructorMap.get(s.instructor_id)?.full_name : ""}</span>
+                        <span className="text-muted-foreground/70"> {s.instructor_id ? instructorMap.get(s.instructor_id)?.full_name : ""}</span>
                       </span>
                       {isStaff && (
                         <Button variant="ghost" size="sm" onClick={() => deactivate.mutate(s.id)} aria-label="Remove">
-                          <XCircle className="h-4 w-4 text-gray-400" />
+                          <XCircle className="h-4 w-4 text-muted-foreground/70" />
                         </Button>
                       )}
                     </div>

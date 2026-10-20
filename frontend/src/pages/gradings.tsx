@@ -21,7 +21,7 @@ import { DateInput } from "@/components/common/date-inputs";
 
 function beltName(beltMap: Map<number, Belt>, id: number | null, stripes = 0) {
   const b = id ? beltMap.get(id) : undefined;
-  if (!b) return <span className="text-gray-400">No belt</span>;
+  if (!b) return <span className="text-muted-foreground/70">No belt</span>;
   return <BeltSwatch color={b.color} name={`${b.name}${stripes ? ` +${stripes}` : ""}`} />;
 }
 
@@ -134,7 +134,7 @@ function EventDialog({ event }: { event: GradingEvent }) {
                     }}
                   />
                   {e.member_name}
-                  <span className="text-gray-400">
+                  <span className="text-muted-foreground/70">
                     seminars {e.seminar_points}/{e.seminars_required} · {e.classes_since_promotion} classes
                   </span>
                   {e.seminar_requirement_met && <CheckCircle2 className="h-4 w-4 text-success" />}
@@ -263,7 +263,7 @@ function ReadinessTab() {
             <TableCell>{r.member_name}</TableCell>
             <TableCell>{beltName(beltMap, r.belt_rank_id, r.stripes)}</TableCell>
             <TableCell>{beltName(beltMap, r.next_rank_id)}</TableCell>
-            <TableCell className={r.seminar_requirement_met ? "text-green-700" : "text-amber-700"}>
+            <TableCell className={r.seminar_requirement_met ? "text-success" : "text-warning"}>
               {r.seminar_points} / {r.seminars_required}
             </TableCell>
             <TableCell>{r.classes_since_promotion}</TableCell>
@@ -322,7 +322,7 @@ function SeminarsTab() {
             <Card key={s.id} className="cursor-pointer card-hover" onClick={() => setSelected(s)}>
               <CardContent className="p-4">
                 <p className="font-medium">{s.title}</p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   {fmtDate(s.seminar_date)} · {s.points} point(s) · {s.attendee_count} attended
                 </p>
               </CardContent>
@@ -335,7 +335,7 @@ function SeminarsTab() {
           <DialogHeader>
             <DialogTitle>{selected?.title}</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-gray-500">{attendees.length} attendee(s) recorded</p>
+          <p className="text-sm text-muted-foreground">{attendees.length} attendee(s) recorded</p>
           <Input placeholder="Find student (name or phone)" value={q} onChange={(e) => setQ(e.target.value)} />
           {found.map((m) => (
             <div key={m.id} className="flex items-center justify-between text-sm border rounded p-2">

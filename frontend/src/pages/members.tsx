@@ -45,9 +45,9 @@ function SortHeader({
   const Icon = !active ? ArrowUpDown : order === "asc" ? ArrowUp : ArrowDown;
   return (
     <TableHead aria-sort={active ? (order === "asc" ? "ascending" : "descending") : "none"}>
-      <button className="inline-flex items-center gap-1 hover:text-gray-900" onClick={() => onSort(column)}>
+      <button className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => onSort(column)}>
         {label}
-        <Icon className={`h-3 w-3 ${active ? "text-brand" : "text-gray-300"}`} />
+        <Icon className={`h-3 w-3 ${active ? "text-brand" : "text-muted-foreground/70"}`} />
       </button>
     </TableHead>
   );
@@ -126,7 +126,7 @@ export default function Members() {
         <CardContent className="p-4 space-y-4">
           <div className="flex flex-wrap gap-3">
             <div className="relative flex-1 min-w-[220px]">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/70" />
               <Input
                 className="pl-9"
                 placeholder="Search name, phone, member no. or civil ID"
@@ -182,7 +182,7 @@ export default function Members() {
               </TableBody>
             </Table>
           )}
-          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
             <span>
               {first}–{last} of {total} members
             </span>

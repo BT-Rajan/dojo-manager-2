@@ -48,7 +48,7 @@ function FormattedInput({
       required={required}
       aria-invalid={invalid}
       aria-label={rest["aria-label"]}
-      className={cn(invalid && "border-red-500 focus-visible:ring-red-500", className)}
+      className={cn(invalid && "border-destructive focus-visible:ring-destructive", className)}
       onChange={(e) => {
         setText(e.target.value);
         onChange(parse(e.target.value) ?? "");

@@ -132,10 +132,10 @@ export default function MemberDetail() {
               </p>
             )}
             {member.health_notes && (
-              <p className="rounded bg-amber-50 p-2 text-amber-900">Health notes: {member.health_notes}</p>
+              <p className="rounded bg-warning/10 p-2 text-warning">Health notes: {member.health_notes}</p>
             )}
             <p>Media consent: {member.media_consent ? "Yes" : "No"}</p>
-            {member.notes && <p className="text-gray-600">{member.notes}</p>}
+            {member.notes && <p className="text-muted-foreground">{member.notes}</p>}
           </CardContent>
         </Card>
 

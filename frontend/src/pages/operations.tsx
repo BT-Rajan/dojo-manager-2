@@ -75,7 +75,7 @@ function IncidentsTab() {
         )}
       </div>
       {!isStaff ? (
-        <p className="text-sm text-gray-500">Incidents you report go to the branch admin and operations manager.</p>
+        <p className="text-sm text-muted-foreground">Incidents you report go to the branch admin and operations manager.</p>
       ) : incidents.length === 0 ? (
         <Empty>No incidents.</Empty>
       ) : (
@@ -91,9 +91,9 @@ function IncidentsTab() {
               </div>
               {i.persons_involved && <p>Involved: {i.persons_involved}</p>}
               <p>{i.description}</p>
-              {i.action_taken && <p className="text-gray-600">Action: {i.action_taken}</p>}
-              {i.guardian_informed && <p className="text-gray-600">Guardian informed: {i.guardian_informed}</p>}
-              <p className="text-xs text-gray-500">
+              {i.action_taken && <p className="text-muted-foreground">Action: {i.action_taken}</p>}
+              {i.guardian_informed && <p className="text-muted-foreground">Guardian informed: {i.guardian_informed}</p>}
+              <p className="text-xs text-muted-foreground">
                 {i.reported_to_manager_at ? `Reported to manager ${fmtDateTime(i.reported_to_manager_at)}` : "Not yet reported to manager"}
               </p>
               {i.status === "open" && (
@@ -234,8 +234,8 @@ function ComplaintsTab() {
                 <StatusBadge status={c.status} />
               </div>
               <p>{c.description}</p>
-              {c.outcome && <p className="text-gray-600">Outcome: {c.outcome}</p>}
-              {c.escalated && <p className="text-xs text-amber-700">Escalated to operations manager</p>}
+              {c.outcome && <p className="text-muted-foreground">Outcome: {c.outcome}</p>}
+              {c.escalated && <p className="text-xs text-warning">Escalated to operations manager</p>}
               {c.status === "open" && (
                 <Button
                   size="sm"

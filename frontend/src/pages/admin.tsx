@@ -384,7 +384,7 @@ function CatalogTab() {
               <TableRow key={pl.id}>
                 <TableCell>
                   {pl.name}
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-muted-foreground">
                     {branchName(pl.branch_id)} · {pl.duration_days} days
                   </div>
                 </TableCell>
@@ -434,7 +434,7 @@ function CatalogTab() {
               <TableRow key={b.id}>
                 <TableCell>
                   <BeltSwatch color={b.color} name={b.name} />
-                  <div className="text-xs text-gray-500">{label(b.phase)}</div>
+                  <div className="text-xs text-muted-foreground">{label(b.phase)}</div>
                 </TableCell>
                 <TableCell>{b.bjj_stripe ?? "—"}</TableCell>
                 <TableCell>{b.bjj_equivalent ?? "—"}</TableCell>

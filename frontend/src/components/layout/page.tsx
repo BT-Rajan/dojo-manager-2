@@ -21,13 +21,13 @@ export function Page({
 }) {
   const { branch } = useBranch();
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
-            <p className="text-sm text-gray-500">
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{title}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
               {subtitle ?? (needsBranch && branch ? `${branch.name} branch` : "")}
             </p>
           </div>
@@ -36,7 +36,7 @@ export function Page({
         {needsBranch && !branch ? (
           <Card>
             <CardContent className="py-10 text-center space-y-3">
-              <p className="text-gray-600">Choose a branch to continue.</p>
+              <p className="text-muted-foreground">Choose a branch to continue.</p>
               <Button asChild>
                 <Link href="/">Choose branch</Link>
               </Button>

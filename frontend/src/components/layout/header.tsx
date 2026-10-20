@@ -46,12 +46,12 @@ export function Header() {
   };
 
   return (
-    <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+    <header className="bg-card shadow-sm border-b border-border sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-wrap justify-between items-center gap-2 py-3">
           <Link href="/" className="flex items-center">
             <Swords className="h-6 w-6 text-brand mr-3" />
-            <h1 className="text-xl font-semibold text-gray-900">Dojo Manager</h1>
+            <h1 className="text-xl font-semibold text-foreground">Dojo Manager</h1>
           </Link>
 
           <div className="flex items-center gap-3">
@@ -73,16 +73,16 @@ export function Header() {
               </Select>
             )}
             {user && (
-              <div className="text-sm text-gray-600 hidden md:block">
+              <div className="text-sm text-muted-foreground hidden md:block">
                 <span>{user.full_name}</span>
-                <span className="text-gray-400 ml-2">{ROLE_LABELS[user.role]}</span>
+                <span className="text-muted-foreground/70 ml-2">{ROLE_LABELS[user.role]}</span>
               </div>
             )}
             <Button
               variant="ghost"
               size="sm"
               onClick={logout}
-              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
               aria-label="Sign out"
             >
               <LogOut className="h-4 w-4" />
@@ -101,7 +101,7 @@ export function Header() {
                   asChild
                   variant={active ? "default" : "ghost"}
                   size="sm"
-                  className={active ? "bg-brand hover:bg-blue-700" : ""}
+                  className=""
                 >
                   <Link href={path}>
                     <Icon className="h-4 w-4 mr-1" />

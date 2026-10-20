@@ -23,9 +23,9 @@ export function StatCard({
     <Card className="card-hover">
       <CardContent className="p-5 flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-500">{title}</p>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
-          {hint && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
+          <p className="text-sm text-muted-foreground">{title}</p>
+          <p className="text-2xl font-bold text-foreground">{value}</p>
+          {hint && <p className="text-xs text-muted-foreground/70 mt-1">{hint}</p>}
         </div>
         <Icon className={cn("h-8 w-8", tone)} />
       </CardContent>
@@ -34,44 +34,44 @@ export function StatCard({
 }
 
 const TONES: Record<string, string> = {
-  active: "bg-green-100 text-green-800",
-  approved: "bg-green-100 text-green-800",
-  received: "bg-green-100 text-green-800",
-  present: "bg-green-100 text-green-800",
-  pass: "bg-green-100 text-green-800",
-  converted: "bg-green-100 text-green-800",
-  completed: "bg-green-100 text-green-800",
-  closed: "bg-gray-100 text-gray-700",
-  scheduled: "bg-blue-100 text-blue-800",
-  booked: "bg-blue-100 text-blue-800",
-  planned: "bg-blue-100 text-blue-800",
-  submitted: "bg-blue-100 text-blue-800",
-  in_transit: "bg-blue-100 text-blue-800",
-  trial_booked: "bg-blue-100 text-blue-800",
-  new: "bg-blue-100 text-blue-800",
-  ordered: "bg-indigo-100 text-indigo-800",
-  contacted: "bg-indigo-100 text-indigo-800",
-  trial_attended: "bg-indigo-100 text-indigo-800",
-  frozen: "bg-amber-100 text-amber-800",
-  late: "bg-amber-100 text-amber-800",
-  draft: "bg-amber-100 text-amber-800",
-  pending: "bg-amber-100 text-amber-800",
-  deferred: "bg-amber-100 text-amber-800",
-  open: "bg-amber-100 text-amber-800",
-  excused: "bg-gray-100 text-gray-700",
-  inactive: "bg-gray-100 text-gray-700",
-  cancelled: "bg-red-100 text-red-800",
-  rejected: "bg-red-100 text-red-800",
-  absent: "bg-red-100 text-red-800",
-  fail: "bg-red-100 text-red-800",
-  lost: "bg-red-100 text-red-800",
-  expired: "bg-red-100 text-red-800",
-  lapsed: "bg-red-100 text-red-800",
+  active: "bg-success/15 text-success",
+  approved: "bg-success/15 text-success",
+  received: "bg-success/15 text-success",
+  present: "bg-success/15 text-success",
+  pass: "bg-success/15 text-success",
+  converted: "bg-success/15 text-success",
+  completed: "bg-success/15 text-success",
+  closed: "bg-muted text-foreground/80",
+  scheduled: "bg-info/15 text-info",
+  booked: "bg-info/15 text-info",
+  planned: "bg-info/15 text-info",
+  submitted: "bg-info/15 text-info",
+  in_transit: "bg-info/15 text-info",
+  trial_booked: "bg-info/15 text-info",
+  new: "bg-info/15 text-info",
+  ordered: "bg-accent-purple/15 text-accent-purple",
+  contacted: "bg-accent-purple/15 text-accent-purple",
+  trial_attended: "bg-accent-purple/15 text-accent-purple",
+  frozen: "bg-warning/15 text-warning",
+  late: "bg-warning/15 text-warning",
+  draft: "bg-warning/15 text-warning",
+  pending: "bg-warning/15 text-warning",
+  deferred: "bg-warning/15 text-warning",
+  open: "bg-warning/15 text-warning",
+  excused: "bg-muted text-foreground/80",
+  inactive: "bg-muted text-foreground/80",
+  cancelled: "bg-destructive/15 text-destructive",
+  rejected: "bg-destructive/15 text-destructive",
+  absent: "bg-destructive/15 text-destructive",
+  fail: "bg-destructive/15 text-destructive",
+  lost: "bg-destructive/15 text-destructive",
+  expired: "bg-destructive/15 text-destructive",
+  lapsed: "bg-destructive/15 text-destructive",
 };
 
 export function StatusBadge({ status }: { status: string }) {
   return (
-    <Badge variant="outline" className={cn("border-0", TONES[status] ?? "bg-gray-100 text-gray-700")}>
+    <Badge variant="outline" className={cn("border-0", TONES[status] ?? "bg-muted text-foreground/80")}>
       {labelize(status)}
     </Badge>
   );
@@ -80,14 +80,14 @@ export function StatusBadge({ status }: { status: string }) {
 export function BeltSwatch({ color, name }: { color: string; name: string }) {
   return (
     <span className="inline-flex items-center gap-2">
-      <span className="h-3 w-6 rounded-sm border border-gray-300" style={{ backgroundColor: color }} />
+      <span className="h-3 w-6 rounded-sm border border-border" style={{ backgroundColor: color }} />
       {name}
     </span>
   );
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <p className="text-sm text-gray-500 py-6 text-center">{children}</p>;
+  return <p className="text-sm text-muted-foreground py-6 text-center">{children}</p>;
 }
 
 /** Labelled form control. Wrapping in <label> ties the text to the control for assistive tech. */

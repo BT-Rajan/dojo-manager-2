@@ -28,14 +28,14 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-[radial-gradient(60rem_40rem_at_50%_-10%,hsl(var(--brand)/0.14),transparent)]">
       <Card className="w-full max-w-md glass-effect">
         <CardHeader className="text-center">
           <div className="mx-auto mb-3 h-14 w-14 rounded-full brand-gradient flex items-center justify-center">
             <Swords className="h-7 w-7 text-white" />
           </div>
           <CardTitle className="text-2xl">Dojo Manager</CardTitle>
-          <p className="text-sm text-gray-500">Martial arts academy management</p>
+          <p className="text-sm text-muted-foreground">Martial arts academy management</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={submit} className="space-y-4">
@@ -61,7 +61,7 @@ export default function Login() {
               />
             </div>
             {error && (
-              <p role="alert" className="text-sm text-red-600">
+              <p role="alert" className="text-sm text-destructive">
                 {error}
               </p>
             )}

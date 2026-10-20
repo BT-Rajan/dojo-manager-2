@@ -124,7 +124,7 @@ export default function Leads() {
                     <TableRow key={l.id}>
                       <TableCell>
                         {l.full_name}
-                        <div className="text-xs text-gray-500">{l.phone}</div>
+                        <div className="text-xs text-muted-foreground">{l.phone}</div>
                       </TableCell>
                       <TableCell>{label(l.source)}</TableCell>
                       <TableCell>{l.program_id ? programMap.get(l.program_id)?.name : "—"}</TableCell>
@@ -133,7 +133,7 @@ export default function Leads() {
                       </TableCell>
                       <TableCell>
                         {l.next_action ?? "—"}
-                        {l.next_action_date && <div className="text-xs text-gray-500">{fmtDate(l.next_action_date)}</div>}
+                        {l.next_action_date && <div className="text-xs text-muted-foreground">{fmtDate(l.next_action_date)}</div>}
                       </TableCell>
                       <TableCell className="text-right space-x-1 whitespace-nowrap">
                         {isOpen && (
@@ -154,7 +154,7 @@ export default function Leads() {
                             <Button size="sm" onClick={() => startConvert(l)}>
                               Sign up
                             </Button>
-                            <Button size="sm" variant="ghost" className="text-red-600" onClick={() => setAction({ kind: "lost", lead: l })}>
+                            <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setAction({ kind: "lost", lead: l })}>
                               Lost
                             </Button>
                           </>

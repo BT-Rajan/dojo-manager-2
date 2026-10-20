@@ -123,7 +123,7 @@ function StockTab() {
                 <TableCell>{itemLabel(s.item)}</TableCell>
                 <TableCell>{label(s.item.category)}</TableCell>
                 <TableCell className="text-right">{kd(s.item.unit_price)}</TableCell>
-                <TableCell className={`text-right font-medium ${s.below_reorder ? "text-red-600" : ""}`}>{s.quantity}</TableCell>
+                <TableCell className={`text-right font-medium ${s.below_reorder ? "text-destructive" : ""}`}>{s.quantity}</TableCell>
                 <TableCell className="text-right">
                   <Button size="sm" variant="outline" disabled={s.quantity === 0} onClick={() => setSelling(s)}>
                     <ShoppingCart className="h-4 w-4 mr-1" /> Sell
@@ -261,7 +261,7 @@ function PurchasingTab() {
                 <TableCell className="font-mono text-xs">{r.ref_no}</TableCell>
                 <TableCell>
                   {r.vendor_name}
-                  <div className="text-xs text-gray-500">{label(r.vendor_type)}</div>
+                  <div className="text-xs text-muted-foreground">{label(r.vendor_type)}</div>
                 </TableCell>
                 <TableCell className="text-sm">
                   {r.lines.map((l) => (
@@ -272,7 +272,7 @@ function PurchasingTab() {
                 </TableCell>
                 <TableCell>
                   <StatusBadge status={r.status} />
-                  {r.decision_note && <div className="text-xs text-gray-500">{r.decision_note}</div>}
+                  {r.decision_note && <div className="text-xs text-muted-foreground">{r.decision_note}</div>}
                 </TableCell>
                 <TableCell className="text-right space-y-1">
                   {r.status === "draft" && (
@@ -340,7 +340,7 @@ function PurchasingTab() {
             </Field>
           </div>
           {vendor.vendor_type === "local" && (
-            <p className="text-xs text-amber-700">Local-vendor purchases are limited to one per branch per month.</p>
+            <p className="text-xs text-warning">Local-vendor purchases are limited to one per branch per month.</p>
           )}
           <LineEditor lines={lines} onChange={setLines} />
           <Button disabled={!vendor.vendor_name || !validLines(lines) || create.isPending} onClick={() => create.mutate(undefined)}>
@@ -353,14 +353,14 @@ function PurchasingTab() {
           <DialogHeader>
             <DialogTitle>Receive {receiving?.ref_no}</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-gray-500">Count every item and size against the invoice. Enter what actually arrived.</p>
+          <p className="text-sm text-muted-foreground">Count every item and size against the invoice. Enter what actually arrived.</p>
           <Field label="Vendor invoice no.">
             <Input value={invoice} onChange={(e) => setInvoice(e.target.value)} />
           </Field>
           {receiving?.lines.map((l) => (
             <div key={l.id} className="flex items-center justify-between gap-2 text-sm">
               <span>
-                {itemMap.get(l.item_id)?.name} {itemMap.get(l.item_id)?.size} <span className="text-gray-400">(ordered {l.quantity})</span>
+                {itemMap.get(l.item_id)?.name} {itemMap.get(l.item_id)?.size} <span className="text-muted-foreground/70">(ordered {l.quantity})</span>
               </span>
               <Input
                 type="number"
@@ -526,7 +526,7 @@ function CountsTab() {
         <Empty>No counts recorded.</Empty>
       ) : (
         counts.map((c) => (
-          <div key={c.id} className="rounded border bg-white p-4 space-y-2">
+          <div key={c.id} className="rounded border bg-card p-4 space-y-2">
             <div className="flex items-center justify-between">
               <p className="font-medium">
                 {c.period.slice(5, 7)}-{c.period.slice(0, 4)} <StatusBadge status={c.status} />
@@ -538,7 +538,7 @@ function CountsTab() {
               )}
             </div>
             {c.lines.filter((l) => l.variance !== 0).length === 0 ? (
-              <p className="text-sm text-gray-500">No variances.</p>
+              <p className="text-sm text-muted-foreground">No variances.</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -560,8 +560,8 @@ function CountsTab() {
                         </TableCell>
                         <TableCell className="text-right">{l.system_qty}</TableCell>
                         <TableCell className="text-right">{l.counted_qty}</TableCell>
-                        <TableCell className={`text-right ${l.variance < 0 ? "text-red-600" : "text-green-700"}`}>{l.variance}</TableCell>
-                        <TableCell>{l.reason ?? <span className="text-red-600">missing</span>}</TableCell>
+                        <TableCell className={`text-right ${l.variance < 0 ? "text-destructive" : "text-success"}`}>{l.variance}</TableCell>
+                        <TableCell>{l.reason ?? <span className="text-destructive">missing</span>}</TableCell>
                       </TableRow>
                     ))}
                 </TableBody>
