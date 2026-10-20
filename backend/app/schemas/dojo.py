@@ -60,7 +60,7 @@ class BeltIn(InModel):
     color: Annotated[str, StringConstraints(min_length=1, max_length=20)]
     sort_order: Annotated[int, Field(ge=0, le=1000)]
     phase: BeltPhase
-    kickboxing_level: Annotated[str, StringConstraints(max_length=100)] | None = None
+    bjj_stripe: Annotated[str, StringConstraints(max_length=100)] | None = None
     bjj_equivalent: Annotated[str, StringConstraints(max_length=100)] | None = None
     seminars_required: Annotated[int, Field(ge=0, le=100)] = 0
 
@@ -70,7 +70,7 @@ class BeltUpdate(InModel):
     color: Annotated[str, StringConstraints(min_length=1, max_length=20)] | None = None
     sort_order: Annotated[int, Field(ge=0, le=1000)] | None = None
     phase: BeltPhase | None = None
-    kickboxing_level: Annotated[str, StringConstraints(max_length=100)] | None = None
+    bjj_stripe: Annotated[str, StringConstraints(max_length=100)] | None = None
     bjj_equivalent: Annotated[str, StringConstraints(max_length=100)] | None = None
     seminars_required: Annotated[int, Field(ge=0, le=100)] | None = None
 
@@ -81,7 +81,7 @@ class BeltOut(OutModel):
     color: str
     sort_order: int
     phase: BeltPhase
-    kickboxing_level: str | None
+    bjj_stripe: str | None
     bjj_equivalent: str | None
     seminars_required: int
 

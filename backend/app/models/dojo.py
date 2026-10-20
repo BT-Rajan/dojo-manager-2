@@ -36,7 +36,7 @@ class BeltPhase(enum.StrEnum):
     BEGINNER = "beginner"
     INTERMEDIATE = "intermediate"
     ADVANCED = "advanced"
-    BLACK = "black"
+    EXPERT = "expert"
 
 
 class Gender(enum.StrEnum):
@@ -95,7 +95,7 @@ class BeltRank(TimestampMixin, Base):
     color: Mapped[str] = mapped_column(String(20))
     sort_order: Mapped[int] = mapped_column(SmallInteger, unique=True)
     phase: Mapped[BeltPhase] = mapped_column(db_enum(BeltPhase))
-    kickboxing_level: Mapped[str | None] = mapped_column(String(100))
+    bjj_stripe: Mapped[str | None] = mapped_column(String(100))
     bjj_equivalent: Mapped[str | None] = mapped_column(String(100))
     seminars_required: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")
 

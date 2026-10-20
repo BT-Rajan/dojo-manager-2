@@ -26,10 +26,10 @@ def upgrade() -> None:
         sa.Column("sort_order", sa.SmallInteger(), nullable=False),
         sa.Column(
             "phase",
-            sa.Enum("beginner", "intermediate", "advanced", "black", name="beltphase"),
+            sa.Enum("beginner", "intermediate", "advanced", "expert", name="beltphase"),
             nullable=False,
         ),
-        sa.Column("kickboxing_level", sa.String(length=100), nullable=True),
+        sa.Column("bjj_stripe", sa.String(length=100), nullable=True),
         sa.Column("bjj_equivalent", sa.String(length=100), nullable=True),
         sa.Column("seminars_required", sa.SmallInteger(), server_default="0", nullable=False),
         sa.Column(

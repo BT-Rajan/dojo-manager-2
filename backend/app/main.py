@@ -20,6 +20,7 @@ from app.api import (
     memberships,
     operations,
     payments,
+    reports,
     users,
 )
 from app.core.config import get_settings
@@ -100,6 +101,7 @@ def create_app() -> FastAPI:
         gradings,
         operations,
         inventory,
+        reports,
     )
     for module in modules:
         api.include_router(module.router)
