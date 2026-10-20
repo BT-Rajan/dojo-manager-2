@@ -7,9 +7,11 @@
 # Optional environment variables (only used when backend/.env does not exist yet):
 #   DOJO_DB_HOST / DOJO_DB_PORT / DOJO_DB_NAME / DOJO_DB_USER   (default 127.0.0.1 / 3306 / dojo / dojo)
 #   DOJO_DB_PASSWORD               app database password (generated if not set)
+# The database is reached only as the app user from backend/.env (never as root). If the
+# database or user is missing and that user cannot create it, the script prints the SQL for
+# an administrator to run and stops.
+#
 # Always honoured:
-#   MYSQL_ROOT_USER / MYSQL_ROOT_PASSWORD  admin account used to create the database and user
-#                                  (default root via the local socket, no password)
 #   DOJO_BOOTSTRAP_OWNER_USERNAME / DOJO_BOOTSTRAP_OWNER_PASSWORD   first owner account
 #                                  (password prompted for if not set)
 set -euo pipefail
@@ -103,46 +105,56 @@ if [[ -n "$WANTED_PASSWORD" && "$(env -u DOJO_DB_PASSWORD bash -c "$(declare -f 
 fi
 echo "Database: $DB_USER@$DB_HOST:$DB_PORT/$DB_NAME"
 
-# Names are used as SQL identifiers, so keep them simple.
 [[ "$DB_NAME" =~ ^[A-Za-z0-9_]+$ ]] || die "DOJO_DB_NAME may only contain letters, digits and _"
-[[ "$DB_USER" =~ ^[A-Za-z0-9_]+$ ]] || die "DOJO_DB_USER may only contain letters, digits and _"
-# Any password works (#, @, !, spaces, quotes ...): it goes into a SQL string literal with
-# single quotes doubled. A backslash would be read differently depending on the server's
-# SQL mode, so that one character is refused rather than guessed at.
-[[ "$DB_PASSWORD" != *\\* ]] || die "the database password must not contain a backslash"
-SQL_PASSWORD="${DB_PASSWORD//\'/\'\'}"
 
-# ---------------------------------------------------------------- database and user
-say "Creating database '$DB_NAME' and user '$DB_USER' (if missing)"
-ROOT_USER="${MYSQL_ROOT_USER:-root}"
-db_admin() {
-  # MYSQL_PWD keeps passwords off the command line (and out of `ps`).
-  if [[ -n "${MYSQL_ROOT_PASSWORD:-}" ]]; then
-    MYSQL_PWD="$MYSQL_ROOT_PASSWORD" "$DB_CLI" -h "$DB_HOST" -P "$DB_PORT" -u "$ROOT_USER" "$@"
-  else
-    "$DB_CLI" -u "$ROOT_USER" "$@"   # local socket authentication
-  fi
+# ---------------------------------------------------------------- database
+# Only the app's own account (from backend/.env) is used; never root or another admin user.
+# MYSQL_PWD keeps the password off the command line (and out of `ps`).
+db_app() { MYSQL_PWD="$DB_PASSWORD" "$DB_CLI" -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" "$@"; }
+
+need_admin() {
+  cat >&2 <<MSG
+
+Error: $1.
+This script connects only as '$DB_USER', so a database administrator needs to run this
+once (with the password from backend/.env in place of <password>):
+
+  CREATE DATABASE IF NOT EXISTS \`$DB_NAME\` CHARACTER SET utf8mb4;
+  CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '<password>';
+  CREATE USER IF NOT EXISTS '$DB_USER'@'127.0.0.1' IDENTIFIED BY '<password>';
+  ALTER USER '$DB_USER'@'localhost' IDENTIFIED BY '<password>';
+  ALTER USER '$DB_USER'@'127.0.0.1' IDENTIFIED BY '<password>';
+  GRANT ALL ON \`$DB_NAME\`.* TO '$DB_USER'@'localhost', '$DB_USER'@'127.0.0.1';
+
+Then run ./runonce.sh again.
+MSG
+  exit 1
 }
-db_admin -e "SELECT 1" >/dev/null 2>&1 \
-  || die "cannot connect as '$ROOT_USER'. Is the database running? Set MYSQL_ROOT_PASSWORD if needed."
-db_admin <<SQL
--- utf8mb4 with the server's default collation (MySQL and MariaDB name theirs differently).
-CREATE DATABASE IF NOT EXISTS \`$DB_NAME\` CHARACTER SET utf8mb4;
-CREATE DATABASE IF NOT EXISTS \`${DB_NAME}_test\` CHARACTER SET utf8mb4;
-CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$SQL_PASSWORD';
-CREATE USER IF NOT EXISTS '$DB_USER'@'127.0.0.1' IDENTIFIED BY '$SQL_PASSWORD';
-ALTER USER '$DB_USER'@'localhost' IDENTIFIED BY '$SQL_PASSWORD';
-ALTER USER '$DB_USER'@'127.0.0.1' IDENTIFIED BY '$SQL_PASSWORD';
-GRANT ALL ON \`$DB_NAME\`.* TO '$DB_USER'@'localhost', '$DB_USER'@'127.0.0.1';
-GRANT ALL ON \`${DB_NAME}_test\`.* TO '$DB_USER'@'localhost', '$DB_USER'@'127.0.0.1';
-SQL
-MYSQL_PWD="$DB_PASSWORD" "$DB_CLI" -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -e "SELECT 1" \
-  >/dev/null || die "the app user cannot log in with the password from backend/.env"
-echo "Done; the app user logs in with the password from backend/.env."
+
+say "Checking database '$DB_NAME' as '$DB_USER'"
+if err="$(db_app -N -e "SELECT 1" "$DB_NAME" 2>&1 >/dev/null)"; then
+  echo "Database exists and '$DB_USER' can use it; skipping creation."
+else
+  case "$err" in
+    *"ERROR 1049"*)  # unknown database: the user logged in, so try creating it as that user
+      if db_app -e "CREATE DATABASE \`$DB_NAME\` CHARACTER SET utf8mb4" 2>/dev/null; then
+        echo "Created database '$DB_NAME' as '$DB_USER'."
+      else
+        need_admin "database '$DB_NAME' does not exist and '$DB_USER' is not allowed to create it"
+      fi ;;
+    *"ERROR 1045"* | *"ERROR 1698"*)  # wrong password, or no such user
+      need_admin "the server refused '$DB_USER' with the password in backend/.env" ;;
+    *"ERROR 1044"*) need_admin "'$DB_USER' has no access to database '$DB_NAME'" ;;
+    *"ERROR 2002"* | *"ERROR 2003"* | *"ERROR 2005"*)
+      die "cannot reach the database server at $DB_HOST:$DB_PORT. Is it running?" ;;
+    *) die "cannot use database '$DB_NAME': $err" ;;
+  esac
+fi
 
 # ---------------------------------------------------------------- schema and data
 say "Applying database migrations"
-(cd "$BACKEND" && "$VENV/bin/alembic" upgrade head)
+(cd "$BACKEND" && "$VENV/bin/alembic" upgrade head) \
+  || die "migrations failed. '$DB_USER' needs full rights on '$DB_NAME' (CREATE, ALTER, INDEX, REFERENCES, ...)"
 
 say "Loading reference data and the first owner account"
 user_count="$(MYSQL_PWD="$DB_PASSWORD" "$DB_CLI" -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -N -e \

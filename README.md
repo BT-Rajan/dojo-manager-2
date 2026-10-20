@@ -71,13 +71,15 @@ command-line client (`mariadb` or `mysql`).
 ./stop.sh
 ```
 
-`runonce.sh` creates the database and user (as MySQL `root` over the local socket, or set
-`MYSQL_ROOT_PASSWORD`), writes `backend/.env` with a generated database password
-(permissions 600; or your own via `DOJO_DB_PASSWORD`; any characters except a backslash and
-`${`), installs dependencies, runs migrations, loads the academy's reference data
-and asks for the first `owner` password (or reads `DOJO_BOOTSTRAP_OWNER_PASSWORD`). On later
-runs it keeps the existing `.env`, reads it exactly as the app does, and only does what
-is missing. `start.sh` applies any new
+`runonce.sh` connects to the database only as the app user from `backend/.env` (never as
+`root`). If that user can already use the database, creation is skipped; if the database is
+missing and the user may create it, it is created; otherwise the script prints the SQL for a
+database administrator to run and stops. On a first run without `backend/.env` it writes one
+(permissions 600) with a generated password, or yours via `DOJO_DB_PASSWORD` (any characters
+except `${`). It then installs dependencies, runs migrations, loads the academy's reference
+data and asks for the first `owner` password (or reads `DOJO_BOOTSTRAP_OWNER_PASSWORD`). Later
+runs keep the existing `.env`, read it exactly as the app does, and only do what is missing.
+`start.sh` applies any new
 migrations, starts both servers in the background, waits until they answer and writes logs
 and process ids to `.run/`; ports can be changed with `API_PORT` / `WEB_PORT`.
 
