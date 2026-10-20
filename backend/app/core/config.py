@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -26,6 +27,14 @@ class Settings(BaseSettings):
     db_pool_recycle: int = 1800
     db_echo: bool = False
 
+    # Where the server listens (used by start.sh and the pm2 app "dojo"). 0.0.0.0 makes it
+    # reachable from other machines; use 127.0.0.1 behind a reverse proxy.
+    host: str = "0.0.0.0"  # noqa: S104 - intended: the academy reaches it over the network
+    port: int = Field(default=8090, ge=1, le=65535)
+
+    # Built React app served at / by the API process (frontend/dist when not set).
+    frontend_dist: str | None = None
+
     # Sessions
     session_cookie_name: str = "dojo_session"
     session_ttl_hours: int = 12
@@ -39,6 +48,11 @@ class Settings(BaseSettings):
     # Initial owner account, created by ``python -m app.seed`` when no users exist.
     bootstrap_owner_username: str = "owner"
     bootstrap_owner_password: SecretStr | None = None
+
+    def frontend_dist_path(self) -> Path:
+        if self.frontend_dist:
+            return Path(self.frontend_dist)
+        return Path(__file__).resolve().parents[3] / "frontend" / "dist"
 
     def database_url(self, driver: str = "asyncmy") -> URL:
         # URL.create takes the raw values, so any password works (#, spaces, quotes, @ ...);

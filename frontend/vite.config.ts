@@ -2,8 +2,9 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
-// In development the FastAPI backend runs on :8000; /api is proxied so the session cookie
-// stays same-origin.
+// Production: `npm run build` and the API process serves dist/ itself on port 8090.
+// Development (`npm run dev`): this dev server proxies /api to the API (default :8090) so the
+// session cookie stays same-origin.
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -18,7 +19,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      "/api": { target: process.env.VITE_API_TARGET ?? "http://127.0.0.1:8000", changeOrigin: false },
+      "/api": { target: process.env.VITE_API_TARGET ?? "http://127.0.0.1:8090", changeOrigin: false },
     },
     fs: { strict: true, deny: ["**/.*"] },
   },

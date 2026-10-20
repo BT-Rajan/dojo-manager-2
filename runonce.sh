@@ -82,9 +82,11 @@ DOJO_DB_PORT=${DOJO_DB_PORT:-3306}
 DOJO_DB_NAME=${DOJO_DB_NAME:-dojo}
 DOJO_DB_USER=${DOJO_DB_USER:-dojo}
 DOJO_DB_PASSWORD=$(env_quote "$WANTED_PASSWORD")
-# Local http:// development; set to true behind HTTPS.
+# Where Dojo Manager listens (API and web app on one port).
+DOJO_HOST=0.0.0.0
+DOJO_PORT=8090
+# Plain http://; set to true once the site is served over HTTPS.
 DOJO_COOKIE_SECURE=false
-DOJO_CORS_ORIGINS=["http://localhost:5173"]
 ENV
   umask 022
   echo "Written (permissions 600). The database password is stored only there."

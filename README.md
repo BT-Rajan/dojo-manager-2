@@ -60,50 +60,81 @@ gradings and seminars, front-desk operations, and inventory.
   never echoed, security headers, `Cache-Control: no-store` on API responses, audit log for
   sensitive actions. API docs are disabled in production.
 
-## Running locally
+## Running
 
-Requirements: Python 3.12+, Node 20+, MySQL 8 or MariaDB 10.11+ (running), and its
-command-line client (`mariadb` or `mysql`).
+Requirements: Python 3.12+, Node 20+, MySQL 8 or MariaDB 10.11+ (running), its command-line
+client (`mariadb` or `mysql`), and optionally [pm2](https://pm2.keymetrics.io/).
 
 ```bash
 ./runonce.sh   # one-time setup; safe to re-run
-./start.sh     # API on :8000, web app on http://localhost:5173
+./start.sh     # Dojo Manager on http://<server>:8090 (pm2 app "dojo")
 ./stop.sh
 ```
 
-`runonce.sh` connects to the database only as the app user from `backend/.env` (never as
-`root`). If that user can already use the database, creation is skipped; if the database is
-missing and the user may create it, it is created; otherwise the script prints the SQL for a
-database administrator to run and stops. On a first run without `backend/.env` it writes one
+Dojo Manager runs as **one process on port 8090**: the FastAPI server answers `/api/...` and
+also serves the built web app, so pages and API share one origin. Change the port or address
+with `DOJO_PORT` / `DOJO_HOST` in `backend/.env` (default `0.0.0.0:8090`, reachable from other
+machines; use `127.0.0.1` behind a reverse proxy), then run `./start.sh` again.
+
+### Setup: `runonce.sh`
+
+Connects to the database only as the app user from `backend/.env` (never as `root`). If that
+user can already use the database, creation is skipped; if the database is missing and the
+user may create it, it is created; otherwise the script prints the SQL for a database
+administrator to run and stops. On a first run without `backend/.env` it writes one
 (permissions 600) with a generated password, or yours via `DOJO_DB_PASSWORD` (any characters
 except `${`). It then installs dependencies, runs migrations, loads the academy's reference
-data and asks for the first `owner` password (or reads `DOJO_BOOTSTRAP_OWNER_PASSWORD`). Later
-runs keep the existing `.env`, read it exactly as the app does, and only do what is missing.
-`start.sh` applies any new
-migrations, starts both servers in the background, waits until they answer and writes logs
-and process ids to `.run/`; ports can be changed with `API_PORT` / `WEB_PORT`.
+data and asks for the first `owner` password (or reads `DOJO_BOOTSTRAP_OWNER_PASSWORD`).
+Later runs keep the existing `.env`, read it exactly as the app does, and only do what is
+missing.
+
+### Start and stop: pm2
+
+`start.sh` builds the web app when its sources changed, applies new database migrations, then
+starts (or restarts) the pm2 app **`dojo`** defined in `ecosystem.config.cjs`, saves the pm2
+process list and waits until the app answers. Without pm2 it runs the same server in the
+background (log in `.run/dojo.log`). `stop.sh` stops it and saves the pm2 list, so a reboot
+does not bring back an app stopped on purpose.
+
+```bash
+pm2 status            # dojo should be "online"
+pm2 logs dojo         # application log
+pm2 restart dojo      # restart without rebuilding (./start.sh also rebuilds and migrates)
+pm2 startup           # once: start pm2 (and dojo) at boot; run the command it prints
+```
+
+pm2 restarts the app if it crashes. To update: `git pull && ./start.sh`.
+
+Over plain `http://` keep `DOJO_COOKIE_SECURE=false` in `backend/.env`, otherwise browsers
+drop the sign-in cookie; once the site is served over HTTPS set it to `true` (and
+`DOJO_ENVIRONMENT=production`, which also turns off the `/api/docs` pages). Open port 8090 in
+the server's firewall if needed (e.g. `ufw allow 8090/tcp`).
+
+### Development
+
+```bash
+cd backend && .venv/bin/uvicorn app.main:app --reload --port 8090   # API
+cd frontend && npm run dev                                          # http://localhost:5173
+```
+
+The Vite dev server reloads on every change and proxies `/api` to port 8090.
 
 ### Manual setup
 
 ```bash
-# Database
-mysql -uroot -e "CREATE DATABASE dojo CHARACTER SET utf8mb4;
+# Database (as an administrator)
+mariadb -uroot -e "CREATE DATABASE dojo CHARACTER SET utf8mb4;
   CREATE USER 'dojo'@'localhost' IDENTIFIED BY 'change-me';
   GRANT ALL ON dojo.* TO 'dojo'@'localhost';"
 
-# API (http://localhost:8000, docs at /api/docs)
 cd backend
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
-cp .env.example .env            # set DOJO_DB_PASSWORD, DOJO_COOKIE_SECURE=false for http
+cp .env.example .env            # set DOJO_DB_PASSWORD
 alembic upgrade head
 DOJO_BOOTSTRAP_OWNER_PASSWORD='choose-a-strong-one' python -m app.seed --reference
-uvicorn app.main:app --reload
-
-# Web (http://localhost:5173, proxies /api to :8000)
-cd ../frontend
-npm ci
-npm run dev
+cd ../frontend && npm ci && npm run build
+cd ../backend && uvicorn app.main:app --host 0.0.0.0 --port 8090   # http://<server>:8090
 ```
 
 Sign in as `owner` with the bootstrap password, then create staff accounts under **Admin**.
@@ -112,7 +143,7 @@ Sign in as `owner` with the bootstrap password, then create staff accounts under
 weekly timetable and uniform/gear catalogue (only into empty tables).
 
 With Docker: `DOJO_DB_PASSWORD=… MYSQL_ROOT_PASSWORD=… docker compose up` starts MySQL and the
-API (migrations run on start).
+API on port 8090 (migrations run on start).
 
 ## Tests
 
@@ -134,7 +165,7 @@ backend/
   app/services/   memberships, stock ledger, audit
   alembic/        migrations, one per build phase
   tests/          API tests against MySQL
-frontend/
+frontend/             built to frontend/dist and served by the API process
   src/components/ui/   shadcn/ui kit
   src/pages/           one page per area
   src/lib/, src/hooks/ API client, types, auth and branch state

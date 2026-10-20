@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,6 +26,7 @@ from app.api import (
 )
 from app.core.config import get_settings
 from app.core.db import dispose_engine, get_sessionmaker
+from app.web import mount_frontend
 
 UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 CSRF_HEADER = "x-requested-with"
@@ -44,7 +46,7 @@ async def lifespan(_: FastAPI):
     await dispose_engine()
 
 
-def create_app() -> FastAPI:
+def create_app(frontend_dist: Path | None = None) -> FastAPI:
     s = get_settings()
     is_prod = s.environment == "production"
     app = FastAPI(
@@ -114,6 +116,8 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(api)
+    # Last, so API routes always win over the frontend's catch-all.
+    mount_frontend(app, frontend_dist or s.frontend_dist_path())
     return app
 
 
