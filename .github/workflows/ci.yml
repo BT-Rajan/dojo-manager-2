@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: dojo
+          MYSQL_USER: dojo
+          MYSQL_PASSWORD: dojo_ci_pw
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s --health-retries=20
+    env:
+      DOJO_DB_HOST: 127.0.0.1
+      DOJO_DB_PASSWORD: dojo_ci_pw
+      DOJO_COOKIE_SECURE: "false"
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check . && ruff format --check .
+      - name: Create test database
+        run: mysql -h 127.0.0.1 -uroot -proot -e "CREATE DATABASE dojo_test CHARACTER SET utf8mb4; GRANT ALL ON dojo_test.* TO 'dojo'@'%';"
+      - name: Migrations round-trip and match models
+        run: alembic upgrade head && alembic downgrade base && alembic upgrade head && alembic check
+      - name: Seed reference data
+        run: python -m app.seed --reference
+        env:
+          DOJO_BOOTSTRAP_OWNER_PASSWORD: ci-owner-password
+      - run: python -m pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build

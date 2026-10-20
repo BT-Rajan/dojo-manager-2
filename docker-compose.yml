@@ -1,0 +1,34 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: dojo
+      MYSQL_USER: dojo
+      MYSQL_PASSWORD: ${DOJO_DB_PASSWORD:?set DOJO_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_0900_ai_ci"]
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      retries: 20
+    ports:
+      - "127.0.0.1:3306:3306"
+
+  api:
+    build: ./backend
+    environment:
+      DOJO_DB_HOST: mysql
+      DOJO_DB_PASSWORD: ${DOJO_DB_PASSWORD}
+      DOJO_COOKIE_SECURE: ${DOJO_COOKIE_SECURE:-false}
+      DOJO_CORS_ORIGINS: '["http://localhost:5173"]'
+      DOJO_BOOTSTRAP_OWNER_PASSWORD: ${DOJO_BOOTSTRAP_OWNER_PASSWORD:-}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+
+volumes:
+  mysql-data:
