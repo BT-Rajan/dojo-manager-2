@@ -21,3 +21,6 @@ dist/
 .DS_Store
 .idea/
 .vscode/
+
+# Local run state (start.sh / stop.sh)
+.run/

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { addDays, format, parseISO, startOfWeek } from "date-fns";
+import { addDays, startOfWeek } from "date-fns";
 import { CalendarPlus, ChevronLeft, ChevronRight, Plus, Users, XCircle } from "lucide-react";
 import { Page } from "@/components/layout/page";
 import { Empty, EnumSelect, Field, RecordSelect, StatusBadge } from "@/components/common";
@@ -11,12 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApiMutation } from "@/hooks/useApiMutation";
+import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useBranch } from "@/hooks/useBranch";
 import { useInstructors, usePrograms } from "@/hooks/useLookups";
-import { WEEKDAYS, fmtDate, fmtTime, isoDate, label } from "@/lib/format";
+import { WEEKDAYS, academyToday, dmy, fmtDate, fmtDay, fmtTime, isoDate, label } from "@/lib/format";
 import { api } from "@/lib/queryClient";
 import type { AttendanceRow, AttendanceStatus, ClassSession, Leave, Member, Schedule } from "@/lib/types";
+import { DateInput, TimeInput } from "@/components/common/date-inputs";
 
 const ATT_STATUSES: AttendanceStatus[] = ["booked", "present", "late", "absent", "excused"];
 
@@ -140,7 +142,7 @@ function SessionsTab() {
   const { programMap } = usePrograms();
   const { instructorMap } = useInstructors(branchId);
   // Academy weeks run Saturday to Friday.
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 6 }));
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(academyToday(), { weekStartsOn: 6 }));
   const [selected, setSelected] = useState<ClassSession | null>(null);
   const from = isoDate(weekStart);
   const to = isoDate(addDays(weekStart, 6));
@@ -165,7 +167,7 @@ function SessionsTab() {
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <span className="font-medium">
-          {format(weekStart, "dd MMM")} – {format(addDays(weekStart, 6), "dd MMM yyyy")}
+          {dmy(weekStart)} – {dmy(addDays(weekStart, 6))}
         </span>
         <Button variant="outline" size="icon" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week">
           <ChevronRight className="h-4 w-4" />
@@ -183,7 +185,7 @@ function SessionsTab() {
           {byDay.map(([day, list]) => (
             <Card key={day}>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">{format(parseISO(day), "EEEE dd MMM")}</CardTitle>
+                <CardTitle className="text-base">{fmtDay(day)}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 {list.map((s) => (
@@ -199,7 +201,15 @@ function SessionsTab() {
                       {s.status !== "scheduled" && <StatusBadge status={s.status} />}
                     </div>
                     <div className="flex justify-between text-xs text-gray-500">
-                      <span>{s.instructor_id ? instructorMap.get(s.instructor_id)?.full_name : "No instructor"}</span>
+                      <span>
+                        {s.instructor_id ? instructorMap.get(s.instructor_id)?.full_name : "No instructor"}
+                        {s.original_instructor_id && (
+                          <span className="text-amber-700">
+                            {" "}
+                            (covering {instructorMap.get(s.original_instructor_id)?.full_name ?? "instructor on leave"})
+                          </span>
+                        )}
+                      </span>
                       <span className="flex items-center gap-1">
                         <Users className="h-3 w-3" /> {s.booked}/{s.capacity} · {s.attended} present
                       </span>
@@ -224,7 +234,7 @@ function TimetableTab() {
   const { programs, programMap } = usePrograms();
   const { instructors, instructorMap } = useInstructors(branchId);
   const [open, setOpen] = useState(false);
-  const [f, setF] = useState({ weekday: "6", start_time: "16:30", end_time: "17:10", capacity: "20" });
+  const [f, setF] = useState({ weekday: "6", start_time: "16:30:00", end_time: "17:10:00", capacity: "20" });
   const [programId, setProgramId] = useState<number | null>(null);
   const [instructorId, setInstructorId] = useState<number | null>(null);
   const { data: schedules = [] } = useQuery<Schedule[]>({
@@ -313,13 +323,13 @@ function TimetableTab() {
               <Input type="number" min={1} value={f.capacity} onChange={(e) => setF({ ...f, capacity: e.target.value })} />
             </Field>
             <Field label="Starts">
-              <Input type="time" value={f.start_time} onChange={(e) => setF({ ...f, start_time: e.target.value })} />
+              <TimeInput value={f.start_time} onChange={(t) => setF({ ...f, start_time: t })} />
             </Field>
             <Field label="Ends">
-              <Input type="time" value={f.end_time} onChange={(e) => setF({ ...f, end_time: e.target.value })} />
+              <TimeInput value={f.end_time} onChange={(t) => setF({ ...f, end_time: t })} />
             </Field>
           </div>
-          <Button disabled={!programId || create.isPending} onClick={() => create.mutate(undefined)}>
+          <Button disabled={!programId || !f.start_time || !f.end_time || create.isPending} onClick={() => create.mutate(undefined)}>
             Save
           </Button>
         </DialogContent>
@@ -340,16 +350,30 @@ function LeaveTab() {
     queryKey: ["/api/leaves", { branch_id: branchId }],
     enabled: branchId !== null,
   });
+  const { toast } = useToast();
+  // Leave changes who teaches already-generated classes, so refresh those too.
+  const affected = ["/api/leaves", "/api/sessions", "/api/dashboard"];
   const create = useApiMutation(
     () =>
-      api("/api/leaves", {
+      api<{ sessions_reassigned: number }>("/api/leaves", {
         method: "POST",
         body: { ...f, reason: f.reason || null, instructor_id: who, cover_instructor_id: cover },
       }),
-    { invalidate: ["/api/leaves"], success: "Leave recorded", onSuccess: () => setOpen(false) },
+    {
+      invalidate: affected,
+      onSuccess: (r) => {
+        setOpen(false);
+        const n = r.sessions_reassigned;
+        toast({
+          title: "Leave recorded",
+          description: n ? `${n} scheduled class(es) handed to ${cover ? "the cover instructor" : "no one — assign a cover"}` : undefined,
+        });
+      },
+    },
   );
   const remove = useApiMutation((id: number) => api(`/api/leaves/${id}`, { method: "DELETE" }), {
-    invalidate: ["/api/leaves"],
+    invalidate: affected,
+    success: "Leave removed; covered classes returned to the instructor",
   });
 
   return (
@@ -403,10 +427,10 @@ function LeaveTab() {
               <RecordSelect value={who} onChange={setWho} records={instructors} render={(i) => i.full_name} />
             </Field>
             <Field label="From">
-              <Input type="date" value={f.start_date} onChange={(e) => setF({ ...f, start_date: e.target.value })} />
+              <DateInput value={f.start_date} onChange={(d) => setF({ ...f, start_date: d })} />
             </Field>
             <Field label="To">
-              <Input type="date" value={f.end_date} onChange={(e) => setF({ ...f, end_date: e.target.value })} />
+              <DateInput value={f.end_date} onChange={(d) => setF({ ...f, end_date: d })} />
             </Field>
             <Field label="Type">
               <EnumSelect value={f.type} onChange={(t) => setF({ ...f, type: t })} options={["annual", "sick", "emergency", "other"]} />
@@ -424,7 +448,7 @@ function LeaveTab() {
               <Input value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} />
             </Field>
           </div>
-          <Button disabled={!who || create.isPending} onClick={() => create.mutate(undefined)}>
+          <Button disabled={!who || !f.start_date || !f.end_date || create.isPending} onClick={() => create.mutate(undefined)}>
             Save
           </Button>
         </DialogContent>

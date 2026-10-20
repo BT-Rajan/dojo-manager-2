@@ -66,6 +66,7 @@ const TONES: Record<string, string> = {
   fail: "bg-red-100 text-red-800",
   lost: "bg-red-100 text-red-800",
   expired: "bg-red-100 text-red-800",
+  lapsed: "bg-red-100 text-red-800",
 };
 
 export function StatusBadge({ status }: { status: string }) {

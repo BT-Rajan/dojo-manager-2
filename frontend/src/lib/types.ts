@@ -56,6 +56,8 @@ export interface Instructor {
 }
 
 export type MemberStatus = "active" | "frozen" | "inactive";
+/** Derived from memberships: active = a membership covers today (Kuwait time). */
+export type Standing = "active" | "lapsed" | "new" | "frozen" | "inactive";
 
 export interface Member {
   id: number;
@@ -80,6 +82,7 @@ export interface Member {
   belt_rank: Belt | null;
   stripes: number;
   status: MemberStatus;
+  standing: Standing;
   joined_on: string;
   notes: string | null;
 }
@@ -156,6 +159,7 @@ export interface ClassSession {
   schedule_id: number | null;
   program_id: number;
   instructor_id: number | null;
+  original_instructor_id: number | null;
   title: string | null;
   session_date: string;
   start_time: string;

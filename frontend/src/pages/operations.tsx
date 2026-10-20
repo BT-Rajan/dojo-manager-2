@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
 import { Plus } from "lucide-react";
 import { Page } from "@/components/layout/page";
 import { Empty, EnumSelect, Field, StatusBadge } from "@/components/common";
@@ -14,9 +13,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import { useAuth } from "@/hooks/useAuth";
 import { useBranch } from "@/hooks/useBranch";
-import { fmtDate, fmtDateTime, label } from "@/lib/format";
+import { academyNow, fmtDate, fmtDateTime, isoDate, label } from "@/lib/format";
 import { api } from "@/lib/queryClient";
 import type { Complaint, Incident } from "@/lib/types";
+import { DateInput, TimeInput } from "@/components/common/date-inputs";
 
 function IncidentsTab() {
   const { branchId } = useBranch();
@@ -25,7 +25,8 @@ function IncidentsTab() {
   const [closing, setClosing] = useState<Incident | null>(null);
   const [action, setAction] = useState("");
   const [f, setF] = useState({
-    occurred_at: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+    occurred_date: isoDate(),
+    occurred_time: academyNow(),
     type: "injury",
     persons_involved: "",
     description: "",
@@ -44,9 +45,13 @@ function IncidentsTab() {
       api("/api/incidents", {
         method: "POST",
         body: {
-          ...Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v === "" ? null : v])),
-          // datetime-local is local time; the API stores UTC.
-          occurred_at: new Date(f.occurred_at).toISOString().slice(0, 19),
+          ...Object.fromEntries(
+            Object.entries(f)
+              .filter(([k]) => !k.startsWith("occurred_"))
+              .map(([k, v]) => [k, v === "" ? null : v]),
+          ),
+          // Academy (Kuwait) wall-clock time; the API converts it to UTC for storage.
+          occurred_at: `${f.occurred_date}T${f.occurred_time}`,
           branch_id: branchId,
         },
       }),
@@ -119,8 +124,11 @@ function IncidentsTab() {
             <DialogTitle>Incident report</DialogTitle>
           </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Date and time">
-              <Input type="datetime-local" value={f.occurred_at} onChange={(e) => setF({ ...f, occurred_at: e.target.value })} />
+            <Field label="Date (DD-MM-YYYY)">
+              <DateInput value={f.occurred_date} onChange={(d) => setF({ ...f, occurred_date: d })} />
+            </Field>
+            <Field label="Time (HH:MM:SS, Kuwait)">
+              <TimeInput value={f.occurred_time} onChange={(t) => setF({ ...f, occurred_time: t })} />
             </Field>
             <Field label="Type">
               <EnumSelect value={f.type} onChange={(t) => setF({ ...f, type: t })} options={["injury", "safety_hazard", "conduct", "other"]} />
@@ -143,7 +151,7 @@ function IncidentsTab() {
               <Input value={f.witnesses} onChange={(e) => setF({ ...f, witnesses: e.target.value })} />
             </Field>
           </div>
-          <Button disabled={f.description.trim().length < 3 || report.isPending} onClick={() => report.mutate(undefined)}>
+          <Button disabled={f.description.trim().length < 3 || !f.occurred_date || !f.occurred_time || report.isPending} onClick={() => report.mutate(undefined)}>
             Submit report
           </Button>
         </DialogContent>
@@ -196,7 +204,7 @@ function ComplaintsTab() {
           status: "closed",
           outcome: outcome.text,
           escalated: outcome.escalated,
-          member_informed_on: outcome.informed ? format(new Date(), "yyyy-MM-dd") : null,
+          member_informed_on: outcome.informed ? isoDate() : null,
         },
       }),
     { ...inv, success: "Complaint closed", onSuccess: () => setClosing(null) },

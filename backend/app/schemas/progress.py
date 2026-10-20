@@ -12,7 +12,7 @@ from app.models.progress import (
     GradingStatus,
     IncidentType,
 )
-from app.schemas.common import InModel, LongText, Name, OutModel, Phone, ShortText
+from app.schemas.common import InModel, LocalDateTime, LongText, Name, OutModel, Phone, ShortText
 
 Title = Annotated[str, StringConstraints(min_length=1, max_length=150)]
 Stripes = Annotated[int, Field(ge=0, le=4)]
@@ -133,7 +133,7 @@ class FollowUpOut(OutModel):
 # ---------------------------------------------------------------- incidents
 class IncidentIn(InModel):
     branch_id: int
-    occurred_at: datetime
+    occurred_at: LocalDateTime
     type: IncidentType
     session_id: int | None = None
     member_id: int | None = None

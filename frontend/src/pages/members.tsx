@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { Plus, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 import { Page } from "@/components/layout/page";
 import { BeltSwatch, Empty, EnumSelect, StatusBadge } from "@/components/common";
 import { MemberForm, toPayload } from "@/components/common/member-form";
@@ -13,21 +13,91 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useApiMutation } from "@/hooks/useApiMutation";
 import { useAuth } from "@/hooks/useAuth";
 import { useBranch } from "@/hooks/useBranch";
-import { api } from "@/lib/queryClient";
+import { fmtDate } from "@/lib/format";
+import { api, apiPage } from "@/lib/queryClient";
 import type { Member } from "@/lib/types";
+
+type SortKey = "member_no" | "name" | "age" | "belt" | "joined_on" | "standing";
+const PAGE_SIZES = ["25", "50", "100", "200"];
+const STANDING_LABELS = {
+  all: "All members",
+  active: "Active (covered today)",
+  lapsed: "Lapsed",
+  new: "New (no membership yet)",
+  frozen: "Frozen",
+  inactive: "Inactive",
+};
+
+function SortHeader({
+  label,
+  column,
+  sort,
+  order,
+  onSort,
+}: {
+  label: string;
+  column: SortKey;
+  sort: SortKey;
+  order: "asc" | "desc";
+  onSort: (c: SortKey) => void;
+}) {
+  const active = sort === column;
+  const Icon = !active ? ArrowUpDown : order === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <TableHead aria-sort={active ? (order === "asc" ? "ascending" : "descending") : "none"}>
+      <button className="inline-flex items-center gap-1 hover:text-gray-900" onClick={() => onSort(column)}>
+        {label}
+        <Icon className={`h-3 w-3 ${active ? "text-brand" : "text-gray-300"}`} />
+      </button>
+    </TableHead>
+  );
+}
 
 export default function Members() {
   const { branchId } = useBranch();
   const { isStaff } = useAuth();
   const [, setLocation] = useLocation();
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState<string>("active");
+  const [standing, setStanding] = useState("all");
+  const [sort, setSort] = useState<SortKey>("name");
+  const [order, setOrder] = useState<"asc" | "desc">("asc");
+  const [pageSize, setPageSize] = useState("50");
+  const [page, setPage] = useState(1);
   const [open, setOpen] = useState(false);
 
-  const { data: members = [], isLoading } = useQuery<Member[]>({
-    queryKey: ["/api/members", { branch_id: branchId, q: q.trim() || undefined, status: status === "all" ? undefined : status }],
+  // Any change to what is listed starts again from the first page.
+  useEffect(() => setPage(1), [branchId, q, standing, sort, order, pageSize]);
+
+  const limit = Number(pageSize);
+  const params = {
+    branch_id: branchId,
+    q: q.trim() || undefined,
+    standing: standing === "all" ? undefined : standing,
+    sort,
+    order,
+    limit,
+    offset: (page - 1) * limit,
+  };
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["/api/members", params],
+    queryFn: () => apiPage<Member>("/api/members", params),
     enabled: branchId !== null,
+    placeholderData: keepPreviousData,
   });
+  const members = data?.rows ?? [];
+  const total = data?.total ?? 0;
+  const pages = Math.max(1, Math.ceil(total / limit));
+  const first = total === 0 ? 0 : (page - 1) * limit + 1;
+  const last = Math.min(page * limit, total);
+
+  const onSort = (column: SortKey) => {
+    if (column === sort) setOrder(order === "asc" ? "desc" : "asc");
+    else {
+      setSort(column);
+      setOrder("asc");
+    }
+  };
+  const header = { sort, order, onSort };
 
   const create = useApiMutation(
     (body: Record<string, unknown>) => api<Member>("/api/members", { method: "POST", body }),
@@ -64,8 +134,8 @@ export default function Members() {
                 onChange={(e) => setQ(e.target.value)}
               />
             </div>
-            <div className="w-40">
-              <EnumSelect value={status} onChange={setStatus} options={["active", "frozen", "inactive", "all"]} />
+            <div className="w-56">
+              <EnumSelect value={standing} onChange={setStanding} options={Object.keys(STANDING_LABELS)} labels={STANDING_LABELS} />
             </div>
           </div>
           {isLoading ? (
@@ -73,15 +143,16 @@ export default function Members() {
           ) : members.length === 0 ? (
             <Empty>No members found.</Empty>
           ) : (
-            <Table>
+            <Table className={isFetching ? "opacity-70" : ""}>
               <TableHeader>
                 <TableRow>
-                  <TableHead>No.</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Age</TableHead>
+                  <SortHeader label="No." column="member_no" {...header} />
+                  <SortHeader label="Name" column="name" {...header} />
+                  <SortHeader label="Age" column="age" {...header} />
                   <TableHead>Phone</TableHead>
-                  <TableHead>Belt</TableHead>
-                  <TableHead>Status</TableHead>
+                  <SortHeader label="Belt" column="belt" {...header} />
+                  <SortHeader label="Joined" column="joined_on" {...header} />
+                  <SortHeader label="Standing" column="standing" {...header} />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -102,14 +173,35 @@ export default function Members() {
                         "—"
                       )}
                     </TableCell>
+                    <TableCell>{fmtDate(m.joined_on)}</TableCell>
                     <TableCell>
-                      <StatusBadge status={m.status} />
+                      <StatusBadge status={m.standing} />
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           )}
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
+            <span>
+              {first}–{last} of {total} members
+            </span>
+            <div className="flex items-center gap-2">
+              <span>Rows per page</span>
+              <div className="w-20">
+                <EnumSelect value={pageSize} onChange={setPageSize} options={PAGE_SIZES} labels={Object.fromEntries(PAGE_SIZES.map((n) => [n, n]))} />
+              </div>
+              <Button variant="outline" size="icon" disabled={page <= 1} onClick={() => setPage(page - 1)} aria-label="Previous page">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span>
+                Page {page} of {pages}
+              </span>
+              <Button variant="outline" size="icon" disabled={page >= pages} onClick={() => setPage(page + 1)} aria-label="Next page">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

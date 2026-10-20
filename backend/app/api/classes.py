@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import case, delete, func, select
+from sqlalchemy import case, delete, func, select, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.orm import selectinload
 
@@ -37,6 +37,7 @@ from app.schemas.classes import (
     AttendanceOut,
     GenerateResult,
     GenerateSessionsIn,
+    LeaveCreated,
     LeaveIn,
     LeaveOut,
     MemberAttendanceOut,
@@ -138,11 +139,12 @@ async def generate_sessions(body: GenerateSessionsIn, user: CurrentUser, db: DB)
         )
     )
 
-    def instructor_for(instructor_id: int | None, day: date) -> int | None:
+    def instructors_for(instructor_id: int | None, day: date) -> tuple[int | None, int | None]:
+        """(teaching instructor, instructor on leave being covered)"""
         for lv in leaves:
             if lv.instructor_id == instructor_id and lv.start_date <= day <= lv.end_date:
-                return lv.cover_instructor_id
-        return instructor_id
+                return lv.cover_instructor_id, instructor_id
+        return instructor_id, None
 
     by_weekday: dict[int, list[ClassSchedule]] = {}
     for s in schedules:
@@ -153,12 +155,14 @@ async def generate_sessions(body: GenerateSessionsIn, user: CurrentUser, db: DB)
     while day <= body.date_to:
         for s in by_weekday.get(day.isoweekday(), ()):
             if (s.id, day) not in existing:
+                teacher, on_leave = instructors_for(s.instructor_id, day)
                 rows.append(
                     {
                         "branch_id": s.branch_id,
                         "schedule_id": s.id,
                         "program_id": s.program_id,
-                        "instructor_id": instructor_for(s.instructor_id, day),
+                        "instructor_id": teacher,
+                        "original_instructor_id": on_leave,
                         "title": s.title,
                         "session_date": day,
                         "start_time": s.start_time,
@@ -398,18 +402,43 @@ async def list_leaves(
     return list(await db.scalars(stmt.order_by(InstructorLeave.start_date.desc())))
 
 
-@router.post("/leaves", response_model=LeaveOut, status_code=201, dependencies=staff)
-async def create_leave(body: LeaveIn, user: CurrentUser, db: DB) -> InstructorLeave:
+@router.post("/leaves", response_model=LeaveCreated, status_code=201, dependencies=staff)
+async def create_leave(body: LeaveIn, user: CurrentUser, db: DB) -> dict:
+    """Record leave and hand the instructor's already-generated classes in that period to the
+    cover instructor (unassigned when there is no cover)."""
     inst = await get_scoped_or_404(db, Instructor, body.instructor_id, user)
     await _check_instructor(db, user, body.cover_instructor_id)
     leave = InstructorLeave(**body.model_dump(), branch_id=inst.branch_id)
     db.add(leave)
+    result = await db.execute(
+        update(ClassSession)
+        .where(
+            ClassSession.instructor_id == leave.instructor_id,
+            ClassSession.original_instructor_id.is_(None),
+            ClassSession.status == SessionStatus.SCHEDULED,
+            ClassSession.session_date.between(leave.start_date, leave.end_date),
+        )
+        .values(
+            instructor_id=leave.cover_instructor_id,
+            original_instructor_id=leave.instructor_id,
+        )
+    )
     await db.commit()
-    return leave
+    return LeaveOut.model_validate(leave).model_dump() | {"sessions_reassigned": result.rowcount}
 
 
 @router.delete("/leaves/{leave_id}", status_code=204, dependencies=staff)
 async def delete_leave(leave_id: int, user: CurrentUser, db: DB) -> None:
+    """Cancel leave: classes still being covered go back to the instructor."""
     leave = await get_scoped_or_404(db, InstructorLeave, leave_id, user)
+    await db.execute(
+        update(ClassSession)
+        .where(
+            ClassSession.original_instructor_id == leave.instructor_id,
+            ClassSession.status == SessionStatus.SCHEDULED,
+            ClassSession.session_date.between(leave.start_date, leave.end_date),
+        )
+        .values(instructor_id=leave.instructor_id, original_instructor_id=None)
+    )
     await db.delete(leave)
     await db.commit()

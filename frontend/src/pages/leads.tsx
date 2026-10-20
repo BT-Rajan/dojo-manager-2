@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import { useBranch } from "@/hooks/useBranch";
 import { usePrograms } from "@/hooks/useLookups";
-import { fmtDate, fmtTime, isoDate, label } from "@/lib/format";
+import { academyToday, fmtDate, fmtTime, isoDate, label } from "@/lib/format";
 import { api } from "@/lib/queryClient";
 import type { ClassSession, Lead, Member } from "@/lib/types";
 
@@ -43,7 +43,7 @@ export default function Leads() {
     enabled: branchId !== null,
   });
   const { data: upcoming = [] } = useQuery<ClassSession[]>({
-    queryKey: ["/api/sessions", { branch_id: branchId, date_from: isoDate(), date_to: isoDate(addDays(new Date(), 14)) }],
+    queryKey: ["/api/sessions", { branch_id: branchId, date_from: isoDate(), date_to: isoDate(addDays(academyToday(), 14)) }],
     enabled: action?.kind === "trial",
   });
 

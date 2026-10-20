@@ -1,10 +1,11 @@
-from datetime import date, timedelta
+from datetime import timedelta
 from decimal import Decimal
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.clock import today as academy_today
 from app.core.deps import utcnow
 from app.models import (
     Member,
@@ -46,7 +47,7 @@ async def create_membership(db: AsyncSession, member: Member, body: MembershipIn
         .with_for_update()
     )
     is_renewal = latest_end is not None
-    today = date.today()
+    today = academy_today()
     start = body.start_date
     if start is None:
         # Renewing before expiry continues from the day after the current membership ends.

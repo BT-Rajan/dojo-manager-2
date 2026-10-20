@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { addDays, format, startOfWeek, subDays } from "date-fns";
+import { addDays, startOfWeek, subDays } from "date-fns";
 import { ChevronLeft, ChevronRight, Printer } from "lucide-react";
 import { Page } from "@/components/layout/page";
 import { Empty } from "@/components/common";
@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useBranch } from "@/hooks/useBranch";
-import { fmtDateTime, isoDate, kd, label } from "@/lib/format";
+import { academyToday, fmtDateTime, fmtDay, isoDate, kd, label } from "@/lib/format";
+import { DateInput } from "@/components/common/date-inputs";
 
 interface WeeklySales {
   week_start: string;
@@ -32,8 +33,8 @@ interface AttendanceRow {
 
 export default function Reports() {
   const { branchId, branch } = useBranch();
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 6 }));
-  const [range, setRange] = useState({ from: isoDate(subDays(new Date(), 30)), to: isoDate() });
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(academyToday(), { weekStartsOn: 6 }));
+  const [range, setRange] = useState({ from: isoDate(subDays(academyToday(), 30)), to: isoDate() });
   const ws = isoDate(weekStart);
   const enabled = branchId !== null;
   const { data: sales } = useQuery<WeeklySales>({
@@ -64,7 +65,7 @@ export default function Reports() {
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <span className="font-medium">
-          Week {format(weekStart, "EEE dd MMM")} – {format(addDays(weekStart, 6), "EEE dd MMM yyyy")} · {branch?.name}
+          Week {fmtDay(isoDate(weekStart))} – {fmtDay(isoDate(addDays(weekStart, 6)))} · {branch?.name}
         </span>
         <Button variant="outline" size="icon" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week">
           <ChevronRight className="h-4 w-4" />
@@ -163,9 +164,9 @@ export default function Reports() {
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
           <CardTitle>Attendance by programme</CardTitle>
           <div className="flex gap-2 items-center text-sm">
-            <Input type="date" value={range.from} onChange={(e) => setRange({ ...range, from: e.target.value })} aria-label="From" />
+            <DateInput value={range.from} onChange={(from) => from && setRange({ ...range, from })} aria-label="From" />
             <span>to</span>
-            <Input type="date" value={range.to} onChange={(e) => setRange({ ...range, to: e.target.value })} aria-label="To" />
+            <DateInput value={range.to} onChange={(to) => to && setRange({ ...range, to })} aria-label="To" />
           </div>
         </CardHeader>
         <CardContent>
