@@ -1,9 +1,12 @@
 name: CI
 
+# Paused: runs only when started by hand (GitHub > Actions > CI > Run workflow).
+# To run it automatically again, add back:
+#   pull_request:
+#   push:
+#     branches: [main]
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
