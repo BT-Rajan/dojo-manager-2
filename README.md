@@ -7,7 +7,7 @@ gradings and seminars, front-desk operations, and inventory.
 | Layer    | Stack |
 |----------|-------|
 | API      | Python 3.12, FastAPI, SQLAlchemy 2 (async, `asyncmy`), Pydantic v2, Alembic |
-| Database | MySQL 8 (InnoDB, utf8mb4) |
+| Database | MySQL 8 or MariaDB 10.11+ (InnoDB, utf8mb4) |
 | Web      | React 18, Vite, TypeScript, Tailwind, shadcn/ui (Radix), TanStack Query, wouter |
 
 ## Features
@@ -62,7 +62,8 @@ gradings and seminars, front-desk operations, and inventory.
 
 ## Running locally
 
-Requirements: Python 3.12+, Node 22, MySQL 8 (running), and the `mysql` client.
+Requirements: Python 3.12+, Node 20+, MySQL 8 or MariaDB 10.11+ (running), and its
+command-line client (`mariadb` or `mysql`).
 
 ```bash
 ./runonce.sh   # one-time setup; safe to re-run
@@ -72,9 +73,11 @@ Requirements: Python 3.12+, Node 22, MySQL 8 (running), and the `mysql` client.
 
 `runonce.sh` creates the database and user (as MySQL `root` over the local socket, or set
 `MYSQL_ROOT_PASSWORD`), writes `backend/.env` with a generated database password
-(permissions 600), installs dependencies, runs migrations, loads the academy's reference data
+(permissions 600; or your own via `DOJO_DB_PASSWORD`; any characters except a backslash and
+`${`), installs dependencies, runs migrations, loads the academy's reference data
 and asks for the first `owner` password (or reads `DOJO_BOOTSTRAP_OWNER_PASSWORD`). On later
-runs it keeps the existing `.env` and only does what is missing. `start.sh` applies any new
+runs it keeps the existing `.env`, reads it exactly as the app does, and only does what
+is missing. `start.sh` applies any new
 migrations, starts both servers in the background, waits until they answer and writes logs
 and process ids to `.run/`; ports can be changed with `API_PORT` / `WEB_PORT`.
 
