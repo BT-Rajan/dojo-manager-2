@@ -18,8 +18,15 @@ import { useAuth } from "@/hooks/useAuth";
 import { setSelectedBranch, useBranch } from "@/hooks/useBranch";
 import { api, queryClient } from "@/lib/queryClient";
 import { ROLE_LABELS } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 type NavItem = { path: string; label: string; icon: typeof Home; show: boolean };
+
+function initials(name: string | undefined) {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase() || "?";
+}
 
 export function Header() {
   const { user, isManagement, isStaff } = useAuth();
@@ -46,12 +53,14 @@ export function Header() {
   };
 
   return (
-    <header className="bg-card shadow-sm border-b border-border sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-wrap justify-between items-center gap-2 py-3">
-          <Link href="/" className="flex items-center">
-            <Swords className="h-6 w-6 text-brand mr-3" />
-            <h1 className="text-xl font-semibold text-foreground">Dojo Manager</h1>
+    <header className="sticky top-0 z-50 border-b border-border bg-card/85 backdrop-blur supports-[backdrop-filter]:bg-card/75">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-wrap items-center justify-between gap-2 py-3">
+          <Link href="/" className="group flex items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg brand-gradient shadow-sm transition-transform group-hover:scale-105">
+              <Swords className="h-5 w-5 text-white" aria-hidden="true" />
+            </span>
+            <span className="text-lg font-semibold tracking-tight text-foreground">Dojo Manager</span>
           </Link>
 
           <div className="flex items-center gap-3">
@@ -60,7 +69,7 @@ export function Header() {
                 value={branchId ? String(branchId) : undefined}
                 onValueChange={(v) => setSelectedBranch(Number(v))}
               >
-                <SelectTrigger className="w-44" aria-label="Branch">
+                <SelectTrigger className="h-9 w-44" aria-label="Branch">
                   <SelectValue placeholder="Select branch" />
                 </SelectTrigger>
                 <SelectContent>
@@ -73,41 +82,52 @@ export function Header() {
               </Select>
             )}
             {user && (
-              <div className="text-sm text-muted-foreground hidden md:block">
-                <span>{user.full_name}</span>
-                <span className="text-muted-foreground/70 ml-2">{ROLE_LABELS[user.role]}</span>
+              <div className="flex items-center gap-2.5">
+                <span
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary"
+                  aria-hidden="true"
+                >
+                  {initials(user.full_name)}
+                </span>
+                <div className="hidden leading-tight md:block">
+                  <p className="text-sm font-medium text-foreground">{user.full_name}</p>
+                  <p className="text-xs text-muted-foreground">{ROLE_LABELS[user.role]}</p>
+                </div>
               </div>
             )}
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={logout}
-              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              className="h-9 w-9 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
               aria-label="Sign out"
+              title="Sign out"
             >
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
-        <nav className="flex flex-wrap gap-1 pb-3">
+        <nav aria-label="Main" className="flex flex-wrap gap-1 pb-2.5">
           {nav
             .filter((n) => n.show)
             .map(({ path, label, icon: Icon }) => {
               const active = location === path || location.startsWith(`${path}/`);
               return (
-                <Button
+                <Link
                   key={path}
-                  asChild
-                  variant={active ? "default" : "ghost"}
-                  size="sm"
-                  className=""
+                  href={path}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    active
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
                 >
-                  <Link href={path}>
-                    <Icon className="h-4 w-4 mr-1" />
-                    {label}
-                  </Link>
-                </Button>
+                  <Icon className="h-4 w-4" aria-hidden="true" />
+                  {label}
+                </Link>
               );
             })}
         </nav>

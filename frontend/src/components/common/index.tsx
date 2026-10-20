@@ -21,13 +21,15 @@ export function StatCard({
 }) {
   return (
     <Card className="card-hover">
-      <CardContent className="p-5 flex items-center justify-between">
-        <div>
-          <p className="text-sm text-muted-foreground">{title}</p>
-          <p className="text-2xl font-bold text-foreground">{value}</p>
-          {hint && <p className="text-xs text-muted-foreground/70 mt-1">{hint}</p>}
+      <CardContent className="p-5 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <p className="mt-1 text-2xl font-semibold tabular text-foreground">{value}</p>
+          {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
         </div>
-        <Icon className={cn("h-8 w-8", tone)} />
+        <span className={cn("relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg before:absolute before:inset-0 before:rounded-lg before:bg-current before:opacity-10", tone)}>
+          <Icon className="relative h-5 w-5" aria-hidden="true" />
+        </span>
       </CardContent>
     </Card>
   );
@@ -71,7 +73,8 @@ const TONES: Record<string, string> = {
 
 export function StatusBadge({ status }: { status: string }) {
   return (
-    <Badge variant="outline" className={cn("border-0", TONES[status] ?? "bg-muted text-foreground/80")}>
+    <Badge variant="outline" className={cn("gap-1.5 border-0", TONES[status] ?? "bg-muted text-foreground/80")}>
+      <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
       {labelize(status)}
     </Badge>
   );
@@ -80,7 +83,7 @@ export function StatusBadge({ status }: { status: string }) {
 export function BeltSwatch({ color, name }: { color: string; name: string }) {
   return (
     <span className="inline-flex items-center gap-2">
-      <span className="h-3 w-6 rounded-sm border border-border" style={{ backgroundColor: color }} />
+      <span className="h-3 w-6 rounded-sm border border-border shadow-sm" style={{ backgroundColor: color }} />
       {name}
     </span>
   );
