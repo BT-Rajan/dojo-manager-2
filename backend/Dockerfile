@@ -10,5 +10,5 @@ COPY . .
 RUN useradd --system --uid 10001 dojo && chown -R dojo /app
 USER dojo
 
-EXPOSE 8000
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --workers ${WEB_CONCURRENCY:-2}"]
+EXPOSE 8090
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8090 --proxy-headers --workers ${WEB_CONCURRENCY:-2}"]
