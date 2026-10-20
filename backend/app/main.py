@@ -12,10 +12,12 @@ from app.api import (
     branches,
     catalog,
     classes,
+    gradings,
     instructors,
     leads,
     members,
     memberships,
+    operations,
     payments,
     users,
 )
@@ -94,6 +96,8 @@ def create_app() -> FastAPI:
         payments,
         classes,
         leads,
+        gradings,
+        operations,
     )
     for module in modules:
         api.include_router(module.router)

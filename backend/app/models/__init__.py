@@ -30,8 +30,38 @@ from app.models.dojo import (
     Program,
 )
 from app.models.org import AuditLog, Branch, Role, User, UserSession, user_branches
+from app.models.progress import (
+    CaseStatus,
+    Channel,
+    Complaint,
+    ContactMethod,
+    FollowUpOutcome,
+    GradingEvent,
+    GradingOutcome,
+    GradingResult,
+    GradingStatus,
+    Incident,
+    IncidentType,
+    RenewalFollowUp,
+    Seminar,
+    seminar_attendance,
+)
 
 __all__ = [
+    "CaseStatus",
+    "Channel",
+    "Complaint",
+    "ContactMethod",
+    "FollowUpOutcome",
+    "GradingEvent",
+    "GradingOutcome",
+    "GradingResult",
+    "GradingStatus",
+    "Incident",
+    "IncidentType",
+    "RenewalFollowUp",
+    "Seminar",
+    "seminar_attendance",
     "Attendance",
     "AttendanceStatus",
     "ClassSchedule",
