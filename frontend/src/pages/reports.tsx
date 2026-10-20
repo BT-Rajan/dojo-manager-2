@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { addDays, startOfWeek, subDays } from "date-fns";
 import { ChevronLeft, ChevronRight, Printer } from "lucide-react";
 import { Page } from "@/components/layout/page";
-import { Empty } from "@/components/common";
+import { Empty, Loading } from "@/components/common";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -45,7 +45,7 @@ export default function Reports() {
     queryKey: ["/api/reports/weekly-branch", { branch_id: branchId, week_start: ws }],
     enabled,
   });
-  const { data: attendance = [] } = useQuery<AttendanceRow[]>({
+  const { data: attendance = [], isLoading: loading_attendance } = useQuery<AttendanceRow[]>({
     queryKey: ["/api/reports/attendance", { branch_id: branchId, date_from: range.from, date_to: range.to }],
     enabled,
   });
@@ -170,7 +170,7 @@ export default function Reports() {
           </div>
         </CardHeader>
         <CardContent>
-          {attendance.length === 0 ? (
+          {loading_attendance ? <Loading /> : attendance.length === 0 ? (
             <Empty>No classes in this period.</Empty>
           ) : (
             <Table>

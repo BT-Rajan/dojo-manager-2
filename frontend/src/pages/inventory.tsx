@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { Page } from "@/components/layout/page";
-import { Empty, EnumSelect, Field, RecordSelect, StatusBadge } from "@/components/common";
+import { Empty, EnumSelect, Field, Loading, RecordSelect, StatusBadge } from "@/components/common";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -200,7 +200,7 @@ function PurchasingTab() {
   const [received, setReceived] = useState<Record<number, number>>({});
   const [invoice, setInvoice] = useState("");
   const [rejectNote, setRejectNote] = useState<Record<number, string>>({});
-  const { data: requests = [] } = useQuery<PurchaseRequest[]>({
+  const { data: requests = [], isLoading: loading_requests } = useQuery<PurchaseRequest[]>({
     queryKey: ["/api/inventory/purchase-requests", { branch_id: branchId }],
     enabled: branchId !== null,
   });
@@ -242,7 +242,7 @@ function PurchasingTab() {
       >
         <Plus className="h-4 w-4 mr-1" /> New purchase request
       </Button>
-      {requests.length === 0 ? (
+      {loading_requests ? <Loading /> : requests.length === 0 ? (
         <Empty>No purchase requests.</Empty>
       ) : (
         <Table>
@@ -387,7 +387,7 @@ function TransfersTab() {
   const [creating, setCreating] = useState(false);
   const [toBranch, setToBranch] = useState<number | null>(null);
   const [lines, setLines] = useState<Line[]>([{ item_id: 0, quantity: 1 }]);
-  const { data: transfers = [] } = useQuery<Transfer[]>({ queryKey: ["/api/inventory/transfers"] });
+  const { data: transfers = [], isLoading: loading_transfers } = useQuery<Transfer[]>({ queryKey: ["/api/inventory/transfers"] });
   const { data: allBranches = [] } = useQuery<{ id: number; name: string }[]>({ queryKey: ["/api/branches/directory"] });
   const branchName = (id: number) => allBranches.find((b) => b.id === id)?.name ?? `#${id}`;
   const inv = { invalidate: ["/api/inventory"] };
@@ -406,7 +406,7 @@ function TransfersTab() {
       <Button onClick={() => setCreating(true)}>
         <Plus className="h-4 w-4 mr-1" /> Send items to another branch
       </Button>
-      {mine.length === 0 ? (
+      {loading_transfers ? <Loading /> : mine.length === 0 ? (
         <Empty>No transfers.</Empty>
       ) : (
         <Table>
@@ -486,7 +486,7 @@ function CountsTab() {
   const [counting, setCounting] = useState(false);
   const [period, setPeriod] = useState(isoDate().slice(0, 7));
   const [counted, setCounted] = useState<Record<number, { qty: string; reason: string }>>({});
-  const { data: counts = [] } = useQuery<StockCount[]>({
+  const { data: counts = [], isLoading: loading_counts } = useQuery<StockCount[]>({
     queryKey: ["/api/inventory/counts", { branch_id: branchId }],
     enabled: branchId !== null,
   });
@@ -522,7 +522,7 @@ function CountsTab() {
       >
         <Plus className="h-4 w-4 mr-1" /> Start monthly count
       </Button>
-      {counts.length === 0 ? (
+      {loading_counts ? <Loading /> : counts.length === 0 ? (
         <Empty>No counts recorded.</Empty>
       ) : (
         counts.map((c) => (

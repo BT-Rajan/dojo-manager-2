@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, Plus } from "lucide-react";
 import { Page } from "@/components/layout/page";
-import { BeltSwatch, Empty, EnumSelect, Field, RecordSelect, StatusBadge } from "@/components/common";
+import { BeltSwatch, Empty, EnumSelect, Field, Loading, RecordSelect, StatusBadge } from "@/components/common";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,7 +38,7 @@ function EventDialog({ event }: { event: GradingEvent }) {
   const { belts, beltMap } = useBelts();
   const eligibility = useEligibility();
   const url = `/api/gradings/${event.id}/results`;
-  const { data: results = [] } = useQuery<GradingResult[]>({ queryKey: [url] });
+  const { data: results = [], isLoading: loading_results } = useQuery<GradingResult[]>({ queryKey: [url] });
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const names = new Map(eligibility.map((e) => [e.member_id, e.member_name]));
   const inEvent = new Set(results.map((r) => r.member_id));
@@ -60,7 +60,7 @@ function EventDialog({ event }: { event: GradingEvent }) {
           {event.title} · {fmtDate(event.event_date)}
         </DialogTitle>
       </DialogHeader>
-      {results.length === 0 ? (
+      {loading_results ? <Loading /> : results.length === 0 ? (
         <Empty>No candidates yet.</Empty>
       ) : (
         <Table>
@@ -172,7 +172,7 @@ function GradingsTab() {
   const [selected, setSelected] = useState<GradingEvent | null>(null);
   const [f, setF] = useState({ title: "", event_date: isoDate() });
   const [examiner, setExaminer] = useState<number | null>(null);
-  const { data: events = [] } = useQuery<GradingEvent[]>({
+  const { data: events = [], isLoading: loading_events } = useQuery<GradingEvent[]>({
     queryKey: ["/api/gradings", { branch_id: branchId }],
     enabled: branchId !== null,
   });
@@ -188,7 +188,7 @@ function GradingsTab() {
           <Plus className="h-4 w-4 mr-1" /> Schedule grading
         </Button>
       )}
-      {events.length === 0 ? (
+      {loading_events ? <Loading /> : events.length === 0 ? (
         <Empty>No gradings yet.</Empty>
       ) : (
         <Table>
@@ -284,7 +284,7 @@ function SeminarsTab() {
   const [f, setF] = useState({ title: "Self-Defence & Traditional Seminar", seminar_date: isoDate(), points: "1" });
   const [instructorId, setInstructorId] = useState<number | null>(null);
   const [q, setQ] = useState("");
-  const { data: seminars = [] } = useQuery<Seminar[]>({
+  const { data: seminars = [], isLoading: loading_seminars } = useQuery<Seminar[]>({
     queryKey: ["/api/seminars", { branch_id: branchId }],
     enabled: branchId !== null,
   });
@@ -314,7 +314,7 @@ function SeminarsTab() {
           <Plus className="h-4 w-4 mr-1" /> Add seminar
         </Button>
       )}
-      {seminars.length === 0 ? (
+      {loading_seminars ? <Loading /> : seminars.length === 0 ? (
         <Empty>No seminars yet.</Empty>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">

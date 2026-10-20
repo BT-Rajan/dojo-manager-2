@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { Page } from "@/components/layout/page";
-import { Empty, EnumSelect, Field, StatusBadge } from "@/components/common";
+import { Empty, EnumSelect, Field, Loading, StatusBadge } from "@/components/common";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -183,7 +183,7 @@ function ComplaintsTab() {
   const [outcome, setOutcome] = useState({ text: "", informed: true, escalated: false });
   const [f, setF] = useState({ contact_name: "", contact_phone: "", channel: "desk", description: "" });
   const [status, setStatus] = useState("open");
-  const { data: complaints = [] } = useQuery<Complaint[]>({
+  const { data: complaints = [], isLoading: loading_complaints } = useQuery<Complaint[]>({
     queryKey: ["/api/complaints", { branch_id: branchId, status: status === "all" ? undefined : status }],
     enabled: branchId !== null,
   });
@@ -220,7 +220,7 @@ function ComplaintsTab() {
           <EnumSelect value={status} onChange={setStatus} options={["open", "closed", "all"]} />
         </div>
       </div>
-      {complaints.length === 0 ? (
+      {loading_complaints ? <Loading /> : complaints.length === 0 ? (
         <Empty>No complaints.</Empty>
       ) : (
         complaints.map((c) => (

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { addDays, startOfWeek } from "date-fns";
 import { CalendarPlus, ChevronLeft, ChevronRight, Plus, Users, XCircle } from "lucide-react";
 import { Page } from "@/components/layout/page";
-import { Empty, EnumSelect, Field, RecordSelect, StatusBadge } from "@/components/common";
+import { Empty, EnumSelect, Field, Loading, RecordSelect, StatusBadge } from "@/components/common";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -27,7 +27,7 @@ function AttendanceDialog({ session, onClose }: { session: ClassSession; onClose
   const [q, setQ] = useState("");
   const [reason, setReason] = useState("");
   const url = `/api/sessions/${session.id}/attendance`;
-  const { data: rows = [] } = useQuery<AttendanceRow[]>({ queryKey: [url] });
+  const { data: rows = [], isLoading: loading_rows } = useQuery<AttendanceRow[]>({ queryKey: [url] });
   const { data: found = [] } = useQuery<Member[]>({
     queryKey: ["/api/members", { branch_id: session.branch_id, q: q.trim(), status: "active", limit: 10 }],
     enabled: q.trim().length >= 2,
@@ -84,7 +84,7 @@ function AttendanceDialog({ session, onClose }: { session: ClassSession; onClose
             ))}
         </>
       )}
-      {rows.length === 0 ? (
+      {loading_rows ? <Loading /> : rows.length === 0 ? (
         <Empty>No one booked yet.</Empty>
       ) : (
         <Table>
@@ -146,7 +146,7 @@ function SessionsTab() {
   const [selected, setSelected] = useState<ClassSession | null>(null);
   const from = isoDate(weekStart);
   const to = isoDate(addDays(weekStart, 6));
-  const { data: sessions = [] } = useQuery<ClassSession[]>({
+  const { data: sessions = [], isLoading: loading_sessions } = useQuery<ClassSession[]>({
     queryKey: ["/api/sessions", { branch_id: branchId, date_from: from, date_to: to }],
     enabled: branchId !== null,
   });
@@ -178,7 +178,7 @@ function SessionsTab() {
           </Button>
         )}
       </div>
-      {byDay.length === 0 ? (
+      {loading_sessions ? <Loading /> : byDay.length === 0 ? (
         <Empty>No classes this week.</Empty>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -237,7 +237,7 @@ function TimetableTab() {
   const [f, setF] = useState({ weekday: "6", start_time: "16:30:00", end_time: "17:10:00", capacity: "20" });
   const [programId, setProgramId] = useState<number | null>(null);
   const [instructorId, setInstructorId] = useState<number | null>(null);
-  const { data: schedules = [] } = useQuery<Schedule[]>({
+  const { data: schedules = [], isLoading: loading_schedules } = useQuery<Schedule[]>({
     queryKey: ["/api/schedules", { branch_id: branchId }],
     enabled: branchId !== null,
   });
@@ -298,7 +298,7 @@ function TimetableTab() {
             </Card>
           ))}
       </div>
-      {schedules.length === 0 && <Empty>No weekly classes set up.</Empty>}
+      {loading_schedules ? <Loading /> : schedules.length === 0 && <Empty>No weekly classes set up.</Empty>}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
@@ -346,7 +346,7 @@ function LeaveTab() {
   const [f, setF] = useState({ start_date: isoDate(), end_date: isoDate(), type: "annual", reason: "" });
   const [who, setWho] = useState<number | null>(null);
   const [cover, setCover] = useState<number | null>(null);
-  const { data: leaves = [] } = useQuery<Leave[]>({
+  const { data: leaves = [], isLoading: loading_leaves } = useQuery<Leave[]>({
     queryKey: ["/api/leaves", { branch_id: branchId }],
     enabled: branchId !== null,
   });
@@ -383,7 +383,7 @@ function LeaveTab() {
           <Plus className="h-4 w-4 mr-1" /> Record leave
         </Button>
       )}
-      {leaves.length === 0 ? (
+      {loading_leaves ? <Loading /> : leaves.length === 0 ? (
         <Empty>No instructor leave recorded.</Empty>
       ) : (
         <Table>

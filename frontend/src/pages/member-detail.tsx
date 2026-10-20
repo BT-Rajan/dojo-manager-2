@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { Pencil, Phone, Plus } from "lucide-react";
 import { Page } from "@/components/layout/page";
-import { BeltSwatch, Empty, EnumSelect, Field, RecordSelect, StatusBadge } from "@/components/common";
+import { BeltSwatch, Empty, EnumSelect, Field, Loading, RecordSelect, StatusBadge } from "@/components/common";
 import { MemberForm, toPayload } from "@/components/common/member-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,15 +29,15 @@ export default function MemberDetail() {
   const { programMap } = usePrograms();
   const { data: member } = useQuery<Member>({ queryKey: [`/api/members/${id}`] });
   const { plans } = usePlans(member?.branch_id ?? null);
-  const { data: memberships = [] } = useQuery<Membership[]>({ queryKey: [`/api/members/${id}/memberships`] });
-  const { data: payments = [] } = useQuery<Payment[]>({
+  const { data: memberships = [], isLoading: loading_memberships } = useQuery<Membership[]>({ queryKey: [`/api/members/${id}/memberships`] });
+  const { data: payments = [], isLoading: loading_payments } = useQuery<Payment[]>({
     queryKey: ["/api/payments", { member_id: id }],
     enabled: isStaff,
   });
-  const { data: attendance = [] } = useQuery<
+  const { data: attendance = [], isLoading: loading_attendance } = useQuery<
     { session_id: number; session_date: string; start_time: string; program_id: number; status: string }[]
   >({ queryKey: [`/api/members/${id}/attendance`] });
-  const { data: followups = [] } = useQuery<FollowUp[]>({
+  const { data: followups = [], isLoading: loading_followups } = useQuery<FollowUp[]>({
     queryKey: ["/api/followups", { member_id: id }],
     enabled: isStaff,
   });
@@ -150,7 +150,7 @@ export default function MemberDetail() {
               </TabsList>
 
               <TabsContent value="memberships">
-                {memberships.length === 0 ? (
+                {loading_memberships ? <Loading /> : memberships.length === 0 ? (
                   <Empty>No memberships yet.</Empty>
                 ) : (
                   <Table>
@@ -181,7 +181,7 @@ export default function MemberDetail() {
               </TabsContent>
 
               <TabsContent value="payments">
-                {payments.length === 0 ? (
+                {loading_payments ? <Loading /> : payments.length === 0 ? (
                   <Empty>No payments.</Empty>
                 ) : (
                   <Table>
@@ -208,7 +208,7 @@ export default function MemberDetail() {
               </TabsContent>
 
               <TabsContent value="attendance">
-                {attendance.length === 0 ? (
+                {loading_attendance ? <Loading /> : attendance.length === 0 ? (
                   <Empty>No classes attended yet.</Empty>
                 ) : (
                   <Table>
@@ -240,7 +240,7 @@ export default function MemberDetail() {
                 <Button size="sm" variant="outline" onClick={() => setLogging(true)}>
                   <Plus className="h-4 w-4 mr-1" /> Log contact
                 </Button>
-                {followups.length === 0 ? (
+                {loading_followups ? <Loading /> : followups.length === 0 ? (
                   <Empty>No renewal contacts logged.</Empty>
                 ) : (
                   <Table>

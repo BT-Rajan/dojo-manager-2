@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { addDays } from "date-fns";
 import { Plus } from "lucide-react";
 import { Page } from "@/components/layout/page";
-import { Empty, EnumSelect, Field, RecordSelect, StatusBadge } from "@/components/common";
+import { Empty, EnumSelect, Field, Loading, RecordSelect, StatusBadge } from "@/components/common";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -38,7 +38,7 @@ export default function Leads() {
 
   const params =
     filter === "open" ? { open_only: true } : filter === "all" ? {} : { status: filter };
-  const { data: leads = [] } = useQuery<Lead[]>({
+  const { data: leads = [], isLoading: loading_leads } = useQuery<Lead[]>({
     queryKey: ["/api/leads", { branch_id: branchId, ...params }],
     enabled: branchId !== null,
   });
@@ -103,7 +103,7 @@ export default function Leads() {
           <div className="w-52">
             <EnumSelect value={filter} onChange={setFilter} options={["open", ...OPEN_STATUSES, "converted", "lost", "all"]} />
           </div>
-          {leads.length === 0 ? (
+          {loading_leads ? <Loading /> : leads.length === 0 ? (
             <Empty>No leads.</Empty>
           ) : (
             <Table>
