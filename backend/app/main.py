@@ -14,6 +14,7 @@ from app.api import (
     classes,
     gradings,
     instructors,
+    inventory,
     leads,
     members,
     memberships,
@@ -98,6 +99,7 @@ def create_app() -> FastAPI:
         leads,
         gradings,
         operations,
+        inventory,
     )
     for module in modules:
         api.include_router(module.router)

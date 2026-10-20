@@ -29,6 +29,25 @@ from app.models.dojo import (
     PaymentMethod,
     Program,
 )
+from app.models.inventory import (
+    CountStatus,
+    GoodsReceipt,
+    GoodsReceiptLine,
+    InventoryItem,
+    ItemCategory,
+    MovementReason,
+    PurchaseRequest,
+    PurchaseRequestLine,
+    PurchaseStatus,
+    StockCount,
+    StockCountLine,
+    StockLevel,
+    StockMovement,
+    StockTransfer,
+    StockTransferLine,
+    TransferStatus,
+    VendorType,
+)
 from app.models.org import AuditLog, Branch, Role, User, UserSession, user_branches
 from app.models.progress import (
     CaseStatus,
@@ -48,6 +67,23 @@ from app.models.progress import (
 )
 
 __all__ = [
+    "CountStatus",
+    "GoodsReceipt",
+    "GoodsReceiptLine",
+    "InventoryItem",
+    "ItemCategory",
+    "MovementReason",
+    "PurchaseRequest",
+    "PurchaseRequestLine",
+    "PurchaseStatus",
+    "StockCount",
+    "StockCountLine",
+    "StockLevel",
+    "StockMovement",
+    "StockTransfer",
+    "StockTransferLine",
+    "TransferStatus",
+    "VendorType",
     "CaseStatus",
     "Channel",
     "Complaint",
