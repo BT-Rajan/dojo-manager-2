@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useBelts } from "@/hooks/useLookups";
 import type { Member } from "@/lib/types";
+import { DateInput } from "@/components/common/date-inputs";
 
 export type MemberFormValues = {
   first_name: string;
@@ -97,7 +98,7 @@ export function MemberForm({
           <Input type="email" {...text("email")} />
         </Field>
         <Field label="Date of birth">
-          <Input type="date" {...text("date_of_birth")} />
+          <DateInput value={v.date_of_birth} onChange={(d) => set("date_of_birth", d)} />
         </Field>
         <Field label="Gender">
           <EnumSelect value={v.gender || undefined} onChange={(g) => set("gender", g)} options={["male", "female"]} />

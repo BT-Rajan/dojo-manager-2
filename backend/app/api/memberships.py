@@ -1,10 +1,11 @@
-from datetime import date, timedelta
+from datetime import timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import exists, select
 from sqlalchemy.orm import aliased, selectinload
 
+from app.core.clock import today as academy_today
 from app.core.deps import (
     DB,
     MANAGEMENT,
@@ -43,7 +44,7 @@ async def expiring_memberships(
 ) -> list[Membership]:
     """Renewal follow-up list: members whose latest membership has expired recently or
     expires within ``days`` days (the per-shift expiry list)."""
-    today = date.today()
+    today = academy_today()
     later = aliased(Membership)
     has_later = exists().where(
         later.member_id == Membership.member_id,

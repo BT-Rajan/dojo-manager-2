@@ -16,12 +16,13 @@ gradings and seminars, front-desk operations, and inventory.
   (only their assigned branches). Branch isolation is enforced on every API query; rows in
   other branches look like missing rows.
 - **Members**: registration (guardian, emergency contact, health notes, media consent),
-  generated member numbers (`PRM-00001`), search, belt and BJJ stripes.
+  generated member numbers (`PRM-00001`), search, belt and BJJ stripes; paginated, sortable
+  list; standing derived from memberships (active, lapsed, new, frozen, inactive).
 - **Memberships & payments**: plans per branch or academy-wide, priced in KD (3 decimals);
   renewals continue from the current end date; inline payment (KNET / card / cash);
   renewal follow-up list and contact log; payments are append-only and voided by managers.
-- **Classes**: weekly timetable, idempotent generation of dated sessions (cover instructor
-  used during leave), cancel/reschedule with a reason, bulk check-in with capacity lock and a
+- **Classes**: weekly timetable, idempotent generation of dated sessions; recording leave
+  hands already-generated classes to the cover instructor (and back if the leave is removed), cancel/reschedule with a reason, bulk check-in with capacity lock and a
   "membership covers this date" flag, instructor leave.
 - **Leads**: enquiry → contacted → trial booked → attended → member (or lost, with reason).
 - **Gradings & seminars**: Kajukenbo belt system (belt = rank + kickboxing level, stripe =
@@ -34,6 +35,17 @@ gradings and seminars, front-desk operations, and inventory.
   negative; every change is in a movement ledger.
 - **Reports**: dashboard, weekly sales (Saturday–Friday) by method and category, weekly
   branch report vs the previous week, attendance by programme.
+
+## Dates and times
+
+- Shown everywhere as **DD-MM-YYYY** and **HH:mm:ss** (24-hour), in **Kuwait time**, whatever
+  the browser's own time zone or locale. Date, time and month fields are typed in the same
+  formats (DD-MM-YYYY, HH:MM:SS, MM-YYYY).
+- The API exchanges ISO 8601 values. Timestamps are stored in UTC and returned in Kuwait time
+  with their offset (`2026-10-20T16:56:00+03:00`); incoming timestamps without an offset are
+  read as Kuwait time.
+- "Today", expiry lists, revenue and weekly reports use Kuwait calendar days
+  (`DOJO_TIMEZONE`, default `Asia/Kuwait`).
 
 ## Security
 

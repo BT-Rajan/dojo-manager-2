@@ -102,6 +102,10 @@ class ClassSession(TimestampMixin, Base):
     )
     program_id: Mapped[int] = mapped_column(ForeignKey("programs.id"))
     instructor_id: Mapped[int | None] = mapped_column(ForeignKey("instructors.id"), index=True)
+    # Set while the class is covered: the instructor on leave (``instructor_id`` is the cover).
+    original_instructor_id: Mapped[int | None] = mapped_column(
+        ForeignKey("instructors.id"), index=True
+    )
     title: Mapped[str | None] = mapped_column(String(100))
     session_date: Mapped[date] = mapped_column(Date)
     start_time: Mapped[time] = mapped_column(Time)

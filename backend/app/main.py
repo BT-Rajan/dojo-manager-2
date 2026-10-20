@@ -84,6 +84,7 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
         allow_headers=["Content-Type", "X-Requested-With"],
+        expose_headers=["X-Total-Count"],
     )
 
     api = APIRouter(prefix="/api")

@@ -62,6 +62,17 @@ export async function api<T = unknown>(
   return (await res.json()) as T;
 }
 
+/** GET a paginated list; the total matching count comes from the X-Total-Count header. */
+export async function apiPage<T>(url: string, params?: Params): Promise<{ rows: T[]; total: number }> {
+  const res = await fetch(buildUrl(url, params), {
+    credentials: "same-origin",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) throw new ApiError(res.status, await errorMessage(res));
+  const rows = (await res.json()) as T[];
+  return { rows, total: Number(res.headers.get("X-Total-Count") ?? rows.length) };
+}
+
 /** Query keys are `[url, params?]`; switching branch changes params and refetches. */
 const defaultQueryFn: QueryFunction = async ({ queryKey }) => {
   const [url, params] = queryKey as [string, Params | undefined];

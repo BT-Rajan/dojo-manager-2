@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
 import { Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { Page } from "@/components/layout/page";
 import { Empty, EnumSelect, Field, RecordSelect, StatusBadge } from "@/components/common";
@@ -14,9 +13,10 @@ import { useApiMutation } from "@/hooks/useApiMutation";
 import { useAuth } from "@/hooks/useAuth";
 import { useBranch } from "@/hooks/useBranch";
 import { useItems } from "@/hooks/useLookups";
-import { fmtDateTime, kd, label } from "@/lib/format";
+import { fmtDateTime, isoDate, kd, label } from "@/lib/format";
 import { api } from "@/lib/queryClient";
 import type { Item, Line, PurchaseRequest, StockCount, StockRow, Transfer } from "@/lib/types";
+import { MonthInput } from "@/components/common/date-inputs";
 
 const itemLabel = (i: Item) => `${i.name}${i.size ? ` (${i.size})` : ""} · ${i.sku}`;
 
@@ -484,7 +484,7 @@ function CountsTab() {
   const { itemMap } = useItems();
   const stock = useStock();
   const [counting, setCounting] = useState(false);
-  const [period, setPeriod] = useState(format(new Date(), "yyyy-MM"));
+  const [period, setPeriod] = useState(isoDate().slice(0, 7));
   const [counted, setCounted] = useState<Record<number, { qty: string; reason: string }>>({});
   const { data: counts = [] } = useQuery<StockCount[]>({
     queryKey: ["/api/inventory/counts", { branch_id: branchId }],
@@ -529,7 +529,7 @@ function CountsTab() {
           <div key={c.id} className="rounded border bg-white p-4 space-y-2">
             <div className="flex items-center justify-between">
               <p className="font-medium">
-                {c.period} <StatusBadge status={c.status} />
+                {c.period.slice(5, 7)}-{c.period.slice(0, 4)} <StatusBadge status={c.status} />
               </p>
               {c.status === "draft" && isManagement && (
                 <Button size="sm" onClick={() => approve.mutate(c.id)}>
@@ -576,7 +576,7 @@ function CountsTab() {
             <DialogTitle>Monthly count</DialogTitle>
           </DialogHeader>
           <Field label="Month">
-            <Input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} />
+            <MonthInput value={period} onChange={setPeriod} />
           </Field>
           <Table>
             <TableHeader>
@@ -614,7 +614,7 @@ function CountsTab() {
               })}
             </TableBody>
           </Table>
-          <Button disabled={stock.length === 0 || save.isPending} onClick={() => save.mutate(undefined)}>
+          <Button disabled={stock.length === 0 || !period || save.isPending} onClick={() => save.mutate(undefined)}>
             Save count
           </Button>
         </DialogContent>

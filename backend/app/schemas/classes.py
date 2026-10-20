@@ -110,6 +110,7 @@ class SessionOut(OutModel):
     schedule_id: int | None
     program_id: int
     instructor_id: int | None
+    original_instructor_id: int | None
     title: str | None
     session_date: date
     start_time: time
@@ -184,6 +185,10 @@ class LeaveOut(OutModel):
     type: LeaveType
     reason: str | None
     cover_instructor_id: int | None
+
+
+class LeaveCreated(LeaveOut):
+    sessions_reassigned: int = 0
 
 
 # ---------------------------------------------------------------- leads

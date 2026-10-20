@@ -17,6 +17,7 @@ import { useBelts, useInstructors } from "@/hooks/useLookups";
 import { fmtDate, isoDate } from "@/lib/format";
 import { api } from "@/lib/queryClient";
 import type { Belt, Eligibility, GradingEvent, GradingOutcome, GradingResult, Member, Seminar } from "@/lib/types";
+import { DateInput } from "@/components/common/date-inputs";
 
 function beltName(beltMap: Map<number, Belt>, id: number | null, stripes = 0) {
   const b = id ? beltMap.get(id) : undefined;
@@ -225,12 +226,12 @@ function GradingsTab() {
             <Input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder="e.g. Quarterly belt test" />
           </Field>
           <Field label="Date">
-            <Input type="date" value={f.event_date} onChange={(e) => setF({ ...f, event_date: e.target.value })} />
+            <DateInput value={f.event_date} onChange={(d) => setF({ ...f, event_date: d })} />
           </Field>
           <Field label="Examiner">
             <RecordSelect value={examiner} onChange={setExaminer} records={instructors} render={(i) => i.full_name} allowNone="To be confirmed" />
           </Field>
-          <Button disabled={!f.title || create.isPending} onClick={() => create.mutate(undefined)}>
+          <Button disabled={!f.title || !f.event_date || create.isPending} onClick={() => create.mutate(undefined)}>
             Save
           </Button>
         </DialogContent>
@@ -359,7 +360,7 @@ function SeminarsTab() {
             <Input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
           </Field>
           <Field label="Date">
-            <Input type="date" value={f.seminar_date} onChange={(e) => setF({ ...f, seminar_date: e.target.value })} />
+            <DateInput value={f.seminar_date} onChange={(d) => setF({ ...f, seminar_date: d })} />
           </Field>
           <Field label="Points awarded">
             <Input type="number" min={0} max={10} value={f.points} onChange={(e) => setF({ ...f, points: e.target.value })} />

@@ -1,6 +1,6 @@
 """Dashboard and periodic reports (weekly sales, weekly branch report, attendance)."""
 
-from datetime import date, datetime, time, timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -9,10 +9,13 @@ from sqlalchemy import and_, case, exists, func, select, true
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql import ColumnElement
 
+from app.core.clock import day_range_utc, to_local
+from app.core.clock import today as academy_today
 from app.core.deps import ANY_ROLE, DB, STAFF, CurrentUser, ensure_branch, require_roles
 from app.models import (
     Attendance,
     AttendanceStatus,
+    Branch,
     CaseStatus,
     ClassSession,
     Complaint,
@@ -49,10 +52,6 @@ def _branch_filter(user: User, branch_id: int | None):
     return lambda col: col.in_(ids)
 
 
-def _day_bounds(d1: date, d2: date) -> tuple[datetime, datetime]:
-    return datetime.combine(d1, time.min), datetime.combine(d2 + timedelta(days=1), time.min)
-
-
 def _last_saturday(d: date) -> date:
     return d - timedelta(days=(d.weekday() - 5) % 7)  # academy weeks run Saturday-Friday
 
@@ -70,10 +69,33 @@ async def _count(db: DB, stmt) -> int:
     return int(await db.scalar(stmt) or 0)
 
 
+async def _low_stock_count(db: DB, user: User, branch_id: int | None) -> int:
+    """Same rule as the inventory stock page: an active item is low at a branch when its
+    quantity (0 if never stocked there) is at or below the reorder level."""
+    stmt = select(Branch.id).where(Branch.is_active.is_(True))
+    if branch_id is not None:
+        stmt = stmt.where(Branch.id == branch_id)
+    elif not user.sees_all_branches:
+        stmt = stmt.where(Branch.id.in_(user.branch_ids or [-1]))
+    branches = stmt.subquery()
+    qty = func.coalesce(StockLevel.quantity, 0)
+    return await _count(
+        db,
+        select(func.count())
+        .select_from(branches)
+        .join(InventoryItem, InventoryItem.is_active.is_(True))
+        .outerjoin(
+            StockLevel,
+            (StockLevel.branch_id == branches.c.id) & (StockLevel.item_id == InventoryItem.id),
+        )
+        .where(qty <= InventoryItem.reorder_level),
+    )
+
+
 @router.get("/dashboard", dependencies=[require_roles(*ANY_ROLE)])
 async def dashboard(user: CurrentUser, db: DB, branch_id: int | None = None) -> dict[str, Any]:
     f = _branch_filter(user, branch_id)
-    today = date.today()
+    today = academy_today()
     month_start = today.replace(day=1)
     later = aliased(Membership)
     latest = ~exists().where(
@@ -174,26 +196,21 @@ async def dashboard(user: CurrentUser, db: DB, branch_id: int | None = None) -> 
             db,
             select(func.count()).where(f(Complaint.branch_id), Complaint.status == CaseStatus.OPEN),
         ),
-        "low_stock_items": await _count(
-            db,
-            select(func.count())
-            .select_from(StockLevel)
-            .join(InventoryItem, InventoryItem.id == StockLevel.item_id)
-            .where(
-                f(StockLevel.branch_id),
-                InventoryItem.is_active.is_(True),
-                StockLevel.quantity <= InventoryItem.reorder_level,
-            ),
-        ),
+        "low_stock_items": await _low_stock_count(db, user, branch_id),
     }
     if user.role in STAFF:
         rev = select(func.coalesce(func.sum(Payment.amount), 0)).where(
             f(Payment.branch_id), Payment.is_void.is_(False)
         )
-        lo, hi = _day_bounds(today, today)
-        result["revenue_today"] = await db.scalar(rev.where(Payment.paid_at.between(lo, hi)))
-        lo, _ = _day_bounds(month_start, today)
-        result["revenue_month"] = await db.scalar(rev.where(Payment.paid_at.between(lo, hi)))
+        # Half-open [start, end) ranges over Kuwait calendar days, stored in UTC.
+        lo, hi = day_range_utc(today)
+        result["revenue_today"] = await db.scalar(
+            rev.where(Payment.paid_at >= lo, Payment.paid_at < hi)
+        )
+        lo, hi = day_range_utc(month_start, today)
+        result["revenue_month"] = await db.scalar(
+            rev.where(Payment.paid_at >= lo, Payment.paid_at < hi)
+        )
     return result
 
 
@@ -203,9 +220,9 @@ async def weekly_sales(
 ) -> dict[str, Any]:
     """Every transaction of the week (Saturday-Friday) with totals by method and category."""
     ensure_branch(user, branch_id)
-    start = week_start or _last_saturday(date.today())
+    start = week_start or _last_saturday(academy_today())
     end = start + timedelta(days=6)
-    lo, hi = _day_bounds(start, end)
+    lo, hi = day_range_utc(start, end)
     rows = (
         await db.execute(
             select(Payment, Member.first_name, Member.last_name)
@@ -228,7 +245,7 @@ async def weekly_sales(
         lines.append(
             {
                 "payment_id": p.id,
-                "paid_at": p.paid_at,
+                "paid_at": to_local(p.paid_at),
                 "member": f"{first} {last}" if first else None,
                 "category": p.category,
                 "method": p.method,
@@ -249,7 +266,7 @@ async def weekly_sales(
 
 async def _week_measures(db: DB, branch_id: int, start: date) -> dict[str, int]:
     end = start + timedelta(days=6)
-    lo, hi = _day_bounds(start, end)
+    lo, hi = day_range_utc(start, end)
     later = aliased(Membership)
     renewed = exists().where(
         later.member_id == Membership.member_id,
@@ -360,7 +377,7 @@ async def weekly_branch(
 ) -> dict[str, Any]:
     """This week against last week for the weekly branch report."""
     ensure_branch(user, branch_id)
-    start = week_start or _last_saturday(date.today())
+    start = week_start or _last_saturday(academy_today())
     this = await _week_measures(db, branch_id, start)
     last = await _week_measures(db, branch_id, start - timedelta(days=7))
     return {

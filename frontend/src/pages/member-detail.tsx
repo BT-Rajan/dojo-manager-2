@@ -17,6 +17,7 @@ import { usePlans, usePrograms } from "@/hooks/useLookups";
 import { fmtDate, fmtDateTime, fmtTime, kd, label } from "@/lib/format";
 import { api } from "@/lib/queryClient";
 import type { FollowUp, Member, Membership, Payment } from "@/lib/types";
+import { DateInput } from "@/components/common/date-inputs";
 
 const METHODS = ["knet", "card", "cash"] as const;
 const METHOD_LABELS = { knet: "KNET", card: "Visa / Mastercard", cash: "Cash" };
@@ -107,7 +108,7 @@ export default function MemberDetail() {
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <div className="flex items-center gap-2">
-              <StatusBadge status={member.status} />
+              <StatusBadge status={member.standing} />
               {member.belt_rank && (
                 <BeltSwatch
                   color={member.belt_rank.color}
@@ -293,7 +294,7 @@ export default function MemberDetail() {
               />
             </Field>
             <Field label="Start date (blank = today, or day after current membership ends)">
-              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <DateInput value={startDate} onChange={setStartDate} />
             </Field>
             <Field label="Payment">
               <EnumSelect

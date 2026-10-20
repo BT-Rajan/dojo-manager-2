@@ -1,10 +1,9 @@
 """Front-desk operations: renewal follow-ups, incident reports and the complaint log."""
 
-from datetime import date
-
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
+from app.core.clock import today as academy_today
 from app.core.deps import (
     ANY_ROLE,
     DB,
@@ -172,7 +171,7 @@ async def log_complaint(body: ComplaintIn, user: CurrentUser, db: DB) -> Complai
     await _member_in_branch(db, user, body.member_id, body.branch_id)
     branch = await get_or_404(db, Branch, body.branch_id)
     data = body.model_dump()
-    data["received_on"] = data["received_on"] or date.today()
+    data["received_on"] = data["received_on"] or academy_today()
     complaint = Complaint(**data, handled_by=user.id)
     db.add(complaint)
     await db.flush()
@@ -191,7 +190,7 @@ async def update_complaint(
     if data.get("status") == CaseStatus.CLOSED and complaint.status != CaseStatus.CLOSED:
         if not (data.get("outcome") or complaint.outcome):
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Record the outcome")
-        complaint.closed_on = date.today()
+        complaint.closed_on = academy_today()
     elif data.get("status") == CaseStatus.OPEN:
         complaint.closed_on = None
     apply_updates(complaint, data)

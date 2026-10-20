@@ -11,6 +11,8 @@ class Settings(BaseSettings):
 
     app_name: str = "Dojo Manager"
     environment: str = Field(default="development", pattern="^(development|test|production)$")
+    # Calendar days, reports and "today" follow the academy's local time.
+    timezone: str = "Asia/Kuwait"
 
     # MySQL connection. asyncmy is the async driver; PyMySQL is used by Alembic.
     db_host: str = "127.0.0.1"

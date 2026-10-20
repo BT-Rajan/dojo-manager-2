@@ -1,8 +1,9 @@
-from datetime import date, datetime, time, timedelta
+from datetime import date
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
+from app.core.clock import day_range_utc
 from app.core.deps import (
     DB,
     MANAGEMENT,
@@ -38,10 +39,11 @@ async def list_payments(
     stmt = scope_to_branches(select(Payment), Payment.branch_id, user, branch_id)
     if member_id is not None:
         stmt = stmt.where(Payment.member_id == member_id)
+    # Dates are academy (Kuwait) calendar days; paid_at is stored in UTC.
     if date_from:
-        stmt = stmt.where(Payment.paid_at >= datetime.combine(date_from, time.min))
+        stmt = stmt.where(Payment.paid_at >= day_range_utc(date_from)[0])
     if date_to:
-        stmt = stmt.where(Payment.paid_at < datetime.combine(date_to + timedelta(days=1), time.min))
+        stmt = stmt.where(Payment.paid_at < day_range_utc(date_to)[1])
     if method:
         stmt = stmt.where(Payment.method == method)
     if category:

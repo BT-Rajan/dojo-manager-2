@@ -1,9 +1,10 @@
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import EmailStr, Field, StringConstraints, computed_field, model_validator
 
+from app.core.clock import today as academy_today
 from app.models.dojo import (
     BeltPhase,
     Discipline,
@@ -16,6 +17,7 @@ from app.models.dojo import (
 from app.schemas.common import InModel, LongText, Money, Name, OutModel, Phone, ShortText
 
 Age = Annotated[int, Field(ge=3, le=99)]
+Standing = Literal["active", "lapsed", "new", "frozen", "inactive"]
 CivilId = Annotated[str, StringConstraints(pattern=r"^[0-9]{12}$")]  # Kuwaiti civil ID
 
 
@@ -142,7 +144,7 @@ class _MemberFields(InModel):
 
     @model_validator(mode="after")
     def _dob(self):
-        if self.date_of_birth and self.date_of_birth > date.today():
+        if self.date_of_birth and self.date_of_birth > academy_today():
             raise ValueError("date_of_birth cannot be in the future")
         return self
 
@@ -194,6 +196,7 @@ class MemberOut(OutModel):
     belt_rank: BeltOut | None
     stripes: int
     status: MemberStatus
+    standing: Standing = "new"
     joined_on: date
     notes: str | None
 
@@ -207,7 +210,7 @@ class MemberOut(OutModel):
     def age(self) -> int | None:
         if not self.date_of_birth:
             return None
-        t, b = date.today(), self.date_of_birth
+        t, b = academy_today(), self.date_of_birth
         return t.year - b.year - ((t.month, t.day) < (b.month, b.day))
 
 
@@ -283,12 +286,12 @@ class MembershipOut(OutModel):
     @computed_field
     @property
     def days_left(self) -> int:
-        return (self.end_date - date.today()).days
+        return (self.end_date - academy_today()).days
 
     @computed_field
     @property
     def is_expired(self) -> bool:
-        return self.end_date < date.today()
+        return self.end_date < academy_today()
 
 
 class ExpiringMembershipOut(MembershipOut):

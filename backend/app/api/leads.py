@@ -1,8 +1,7 @@
-from datetime import date
-
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import or_, select
 
+from app.core.clock import today as academy_today
 from app.core.deps import (
     DB,
     STAFF,
@@ -88,7 +87,7 @@ async def book_trial(lead_id: int, body: BookTrialIn, user: CurrentUser, db: DB)
     sess = await get_scoped_or_404(db, ClassSession, body.session_id, user)
     if sess.branch_id != lead.branch_id or sess.status != SessionStatus.SCHEDULED:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Not a bookable class")
-    if sess.session_date < date.today():
+    if sess.session_date < academy_today():
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Class is in the past")
     lead.trial_session_id = sess.id
     lead.status = LeadStatus.TRIAL_BOOKED
@@ -112,7 +111,7 @@ async def convert_lead(lead_id: int, body: ConvertLeadIn, user: CurrentUser, db:
         date_of_birth=body.date_of_birth,
         phone=lead.phone,
         email=lead.email,
-        joined_on=date.today(),
+        joined_on=academy_today(),
         notes=lead.notes,
     )
     db.add(member)
