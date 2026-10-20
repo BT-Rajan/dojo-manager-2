@@ -31,10 +31,10 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center p-4 bg-[radial-gradient(60rem_40rem_at_50%_-10%,hsl(var(--brand)/0.14),transparent)]">
       <Card className="w-full max-w-md glass-effect">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-3 h-14 w-14 rounded-full brand-gradient flex items-center justify-center">
-            <Swords className="h-7 w-7 text-white" />
+          <div className="mx-auto mb-3 h-14 w-14 rounded-2xl brand-gradient shadow-md flex items-center justify-center">
+            <Swords className="h-7 w-7 text-white" aria-hidden="true" />
           </div>
-          <CardTitle className="text-2xl">Dojo Manager</CardTitle>
+          <CardTitle className="text-2xl tracking-tight">Dojo Manager</CardTitle>
           <p className="text-sm text-muted-foreground">Martial arts academy management</p>
         </CardHeader>
         <CardContent>
@@ -44,6 +44,7 @@ export default function Login() {
               <Input
                 id="username"
                 autoComplete="username"
+                autoFocus
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
@@ -61,7 +62,7 @@ export default function Login() {
               />
             </div>
             {error && (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 {error}
               </p>
             )}

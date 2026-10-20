@@ -3,7 +3,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 import { Page } from "@/components/layout/page";
-import { BeltSwatch, Empty, EnumSelect, StatusBadge } from "@/components/common";
+import { BeltSwatch, Empty, EnumSelect, Loading, StatusBadge } from "@/components/common";
 import { MemberForm, toPayload } from "@/components/common/member-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -139,7 +139,7 @@ export default function Members() {
             </div>
           </div>
           {isLoading ? (
-            <Empty>Loading…</Empty>
+            <Loading />
           ) : members.length === 0 ? (
             <Empty>No members found.</Empty>
           ) : (

@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
+import { Inbox, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { label as labelize } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -89,8 +90,27 @@ export function BeltSwatch({ color, name }: { color: string; name: string }) {
   );
 }
 
-export function Empty({ children }: { children: ReactNode }) {
-  return <p className="text-sm text-muted-foreground py-6 text-center">{children}</p>;
+export function Empty({ children, icon: Icon = Inbox }: { children: ReactNode; icon?: LucideIcon }) {
+  return (
+    <div className="flex flex-col items-center gap-2 py-10 text-center text-sm text-muted-foreground">
+      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+        <Icon className="h-5 w-5" aria-hidden="true" />
+      </span>
+      <p>{children}</p>
+    </div>
+  );
+}
+
+/** Placeholder rows while a list loads; announces itself to assistive tech. */
+export function Loading({ rows = 5 }: { rows?: number }) {
+  return (
+    <div role="status" aria-live="polite" className="space-y-3 py-2">
+      <span className="sr-only">Loading…</span>
+      {Array.from({ length: rows }, (_, i) => (
+        <Skeleton key={i} className="h-9 w-full" />
+      ))}
+    </div>
+  );
 }
 
 /** Labelled form control. Wrapping in <label> ties the text to the control for assistive tech. */
