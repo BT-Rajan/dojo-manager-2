@@ -122,16 +122,16 @@ export default function Leads() {
                   const isOpen = OPEN_STATUSES.includes(l.status);
                   return (
                     <TableRow key={l.id}>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         {l.full_name}
                         <div className="text-xs text-muted-foreground">{l.phone}</div>
                       </TableCell>
-                      <TableCell>{label(l.source)}</TableCell>
-                      <TableCell>{l.program_id ? programMap.get(l.program_id)?.name : "—"}</TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">{label(l.source)}</TableCell>
+                      <TableCell className="whitespace-nowrap">{l.program_id ? programMap.get(l.program_id)?.name : "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">
                         <StatusBadge status={l.status} />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="min-w-[11rem]">
                         {l.next_action ?? "—"}
                         {l.next_action_date && <div className="text-xs text-muted-foreground">{fmtDate(l.next_action_date)}</div>}
                       </TableCell>

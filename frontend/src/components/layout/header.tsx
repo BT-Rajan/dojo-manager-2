@@ -6,8 +6,10 @@ import {
   ClipboardList,
   Home,
   LogOut,
+  Moon,
   Package,
   Shield,
+  Sun,
   Swords,
   UserPlus,
   Users,
@@ -15,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
+import { useTheme } from "@/hooks/useTheme";
 import { setSelectedBranch, useBranch } from "@/hooks/useBranch";
 import { api, queryClient } from "@/lib/queryClient";
 import { ROLE_LABELS } from "@/lib/format";
@@ -31,6 +34,7 @@ function initials(name: string | undefined) {
 export function Header() {
   const { user, isManagement, isStaff } = useAuth();
   const { branchId, branches } = useBranch();
+  const { theme, toggle } = useTheme();
   const [location, setLocation] = useLocation();
 
   const nav: NavItem[] = [
@@ -95,6 +99,16 @@ export function Header() {
                 </div>
               </div>
             )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggle}
+              className="h-9 w-9 text-muted-foreground"
+              aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+              title={theme === "dark" ? "Light theme" : "Dark theme"}
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
             <Button
               variant="ghost"
               size="icon"
