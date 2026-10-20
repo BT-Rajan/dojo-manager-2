@@ -108,7 +108,7 @@ export function Header() {
           </div>
         </div>
 
-        <nav aria-label="Main" className="flex flex-wrap gap-1 pb-2.5">
+        <nav aria-label="Main" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-2.5 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden">
           {nav
             .filter((n) => n.show)
             .map(({ path, label, icon: Icon }) => {
@@ -119,7 +119,7 @@ export function Header() {
                   href={path}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     active
                       ? "bg-primary/10 text-primary"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground",

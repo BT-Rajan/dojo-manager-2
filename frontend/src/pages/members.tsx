@@ -158,14 +158,14 @@ export default function Members() {
               <TableBody>
                 {members.map((m) => (
                   <TableRow key={m.id}>
-                    <TableCell className="font-mono text-xs">{m.member_no}</TableCell>
+                    <TableCell className="whitespace-nowrap font-mono text-xs">{m.member_no}</TableCell>
                     <TableCell>
-                      <Link href={`/members/${m.id}`} className="text-brand hover:underline">
+                      <Link href={`/members/${m.id}`} className="whitespace-nowrap text-brand hover:underline">
                         {m.full_name}
                       </Link>
                     </TableCell>
                     <TableCell>{m.age ?? "—"}</TableCell>
-                    <TableCell>{m.phone}</TableCell>
+                    <TableCell className="whitespace-nowrap">{m.phone}</TableCell>
                     <TableCell>
                       {m.belt_rank ? (
                         <BeltSwatch color={m.belt_rank.color} name={`${m.belt_rank.name}${m.stripes ? ` +${m.stripes}` : ""}`} />
@@ -173,7 +173,7 @@ export default function Members() {
                         "—"
                       )}
                     </TableCell>
-                    <TableCell>{fmtDate(m.joined_on)}</TableCell>
+                    <TableCell className="whitespace-nowrap">{fmtDate(m.joined_on)}</TableCell>
                     <TableCell>
                       <StatusBadge status={m.standing} />
                     </TableCell>
@@ -186,7 +186,7 @@ export default function Members() {
             <span>
               {first}–{last} of {total} members
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 whitespace-nowrap">
               <span>Rows per page</span>
               <div className="w-20">
                 <EnumSelect value={pageSize} onChange={setPageSize} options={PAGE_SIZES} labels={Object.fromEntries(PAGE_SIZES.map((n) => [n, n]))} />
