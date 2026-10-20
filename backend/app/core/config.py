@@ -2,6 +2,7 @@ from functools import lru_cache
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy import URL
 
 
 class Settings(BaseSettings):
@@ -39,13 +40,17 @@ class Settings(BaseSettings):
     bootstrap_owner_username: str = "owner"
     bootstrap_owner_password: SecretStr | None = None
 
-    def database_url(self, driver: str = "asyncmy") -> str:
-        from urllib.parse import quote_plus
-
-        pw = quote_plus(self.db_password.get_secret_value())
-        return (
-            f"mysql+{driver}://{quote_plus(self.db_user)}:{pw}@{self.db_host}:{self.db_port}/"
-            f"{self.db_name}?charset=utf8mb4"
+    def database_url(self, driver: str = "asyncmy") -> URL:
+        # URL.create takes the raw values, so any password works (#, spaces, quotes, @ ...);
+        # no hand-made escaping that the driver might decode differently.
+        return URL.create(
+            f"mysql+{driver}",
+            username=self.db_user,
+            password=self.db_password.get_secret_value(),
+            host=self.db_host,
+            port=self.db_port,
+            database=self.db_name,
+            query={"charset": "utf8mb4"},
         )
 
 
