@@ -129,11 +129,19 @@ async def contact(db: AsyncSession, member: Member) -> tuple[str, str]:
     return member.portal_mobile or "", member.language
 
 
-async def class_title(db: AsyncSession, session: ClassSession) -> str:
+async def class_title(db: AsyncSession, session: ClassSession, lang: str = "en") -> str:
     if session.title:
         return session.title
     program = await db.get(Program, session.program_id)
-    return program.name if program else "Class"
+    if program is None:
+        return "حصة" if lang == "ar" else "Class"
+    return program.name_ar if lang == "ar" and program.name_ar else program.name
+
+
+def display_name(member: Member, lang: str = "en") -> str:
+    if lang == "ar" and member.first_name_ar:
+        return f"{member.first_name_ar} {member.last_name_ar or ''}".strip()
+    return f"{member.first_name} {member.last_name}"
 
 
 def when(session: ClassSession) -> str:
@@ -164,7 +172,7 @@ async def promote_waitlist(db: AsyncSession, session: ClassSession) -> list[int]
         member = await db.get(Member, nxt.member_id)
         mobile, lang = await contact(db, member)
         if mobile:
-            title = await class_title(db, session)
+            title = await class_title(db, session, lang)
             text = (
                 f"أصبح لديك مكان في حصة {title} يوم {when(session)}."
                 if lang == "ar"

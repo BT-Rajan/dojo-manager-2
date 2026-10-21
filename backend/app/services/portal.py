@@ -39,6 +39,7 @@ from app.services.bookings import (
     cancel_booking,
     class_title,
     contact,
+    display_name,
     has_started,
     places_taken,
     regular_member_ids,
@@ -106,12 +107,15 @@ async def member_for(db: AsyncSession, session: PortalSession, member_id: int) -
     raise HTTPException(status.HTTP_404_NOT_FOUND, "Member not found")
 
 
-async def profile_name(db: AsyncSession, session: PortalSession) -> str:
+async def profile_name(db: AsyncSession, session: PortalSession, lang: str = "en") -> str:
+    """The signed-in person's name (as registered; in Arabic when asked and recorded)."""
     if session.guardian_id is not None:
         g = await db.get(Guardian, session.guardian_id)
-        return g.full_name if g else ""
+        if g is None:
+            return ""
+        return g.full_name_ar if lang == "ar" and g.full_name_ar else g.full_name
     m = await db.get(Member, session.member_id) if session.member_id else None
-    return f"{m.first_name} {m.last_name}" if m else ""
+    return display_name(m, lang) if m else ""
 
 
 # ---------------------------------------------------------------- membership status
@@ -361,8 +365,8 @@ async def book(
         text = render(
             key,
             msg_lang,
-            member=f"{member.first_name} {member.last_name}",
-            cls=await class_title(db, cls),
+            member=display_name(member, msg_lang),
+            cls=await class_title(db, cls, msg_lang),
             when=when(cls),
         )
         await send_message(db, mobile, text, kind=key, member_id=member.id)
@@ -478,6 +482,7 @@ async def complete_renewal(
         payment=InlinePayment(method=payment.method, reference=gateway_reference[:100]),
     )
     membership = await create_membership(db, member, body, None)
+    await db.flush()  # the session does not autoflush: write the payment before finding it
     pay = await db.scalar(select(Payment).where(Payment.membership_id == membership.id))
     payment.status = RenewalStatus.PAID
     payment.paid_at = utcnow()
@@ -489,7 +494,7 @@ async def complete_renewal(
     if mobile:
         en, ar = MONEY_MESSAGES["renewal_paid"]
         text = (ar if lang == "ar" else en).format(
-            member=f"{member.first_name} {member.last_name}",
+            member=display_name(member, lang),
             end=f"{membership.end_date:%d/%m/%Y}",
             receipt=receipt_ref(branch.code, pay.id) if pay else payment.reference,
         )
@@ -619,3 +624,47 @@ async def apply_freeze(db: AsyncSession, req: MembershipRequest) -> None:
         nxt.end_date += shift
     m.end_date += shift
     m.freeze_used = True
+
+
+# ---------------------------------------------------------------- account and messages
+async def profile(db: AsyncSession, session: PortalSession):
+    if session.guardian_id is not None:
+        return await db.get(Guardian, session.guardian_id)
+    return await db.get(Member, session.member_id) if session.member_id else None
+
+
+async def update_email(db: AsyncSession, session: PortalSession, email: str | None) -> None:
+    p = await profile(db, session)
+    if p is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not allowed")
+    p.email = email or None
+
+
+async def set_messages(
+    db: AsyncSession, session: PortalSession, service_on: bool, broadcasts_on: bool
+) -> None:
+    """Service messages are per family mobile; news and offers are a choice per member."""
+    from app.models import MessagingOptIn
+    from app.services.messaging import opted_in, set_service_messages
+
+    await set_service_messages(db, session.mobile, service_on)
+    for m in await family(db, session):
+        if await opted_in(db, m.id) != broadcasts_on:
+            db.add(MessagingOptIn(member_id=m.id, opted_in=broadcasts_on, source="portal"))
+
+
+async def recent_messages(db: AsyncSession, session: PortalSession, limit: int = 15):
+    from app.models import MessageLog, MessageStatus
+
+    return list(
+        await db.scalars(
+            select(MessageLog)
+            .where(
+                MessageLog.to == session.mobile,
+                MessageLog.status == MessageStatus.SENT,
+                MessageLog.kind != "sign_in_code",
+            )
+            .order_by(MessageLog.at.desc(), MessageLog.id.desc())
+            .limit(limit)
+        )
+    )

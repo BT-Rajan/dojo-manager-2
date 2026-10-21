@@ -20,7 +20,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.db import dispose_engine, get_sessionmaker
 from app.core.security import hash_password
-from app.curriculum import BELT_EXTRAS, BELT_KEYS, SKILLS
+from app.curriculum import (
+    BELT_EXTRAS,
+    BELT_KEYS,
+    BRANCH_NAMES_AR,
+    PROGRAM_NAMES_AR,
+    SKILLS,
+)
 from app.models import (
     BeltPhase,
     BeltRank,
@@ -103,7 +109,8 @@ async def seed_reference(db: AsyncSession) -> None:
     branches = {b.code: b for b in await db.scalars(select(Branch))}
     if await _empty(db, Program):
         db.add_all(
-            Program(name=n, discipline=d, min_age=lo, max_age=hi) for n, d, lo, hi in PROGRAMS
+            Program(name=n, name_ar=PROGRAM_NAMES_AR.get(n), discipline=d, min_age=lo, max_age=hi)
+            for n, d, lo, hi in PROGRAMS
         )
     if await _empty(db, BeltRank):
         db.add_all(
@@ -178,7 +185,7 @@ async def seed(reference: bool) -> None:
     s = get_settings()
     async with get_sessionmaker()() as db:
         if await _empty(db, Branch):
-            db.add_all(Branch(**b) for b in BRANCHES)
+            db.add_all(Branch(**b, name_ar=BRANCH_NAMES_AR.get(b["name"])) for b in BRANCHES)
             await db.flush()
 
         if await _empty(db, User):

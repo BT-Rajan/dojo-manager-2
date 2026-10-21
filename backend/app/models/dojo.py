@@ -78,6 +78,7 @@ class Program(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100), unique=True)
+    name_ar: Mapped[str | None] = mapped_column(String(100))
     discipline: Mapped[Discipline] = mapped_column(db_enum(Discipline))
     description: Mapped[str | None] = mapped_column(Text)
     min_age: Mapped[int | None] = mapped_column(SmallInteger)
@@ -137,6 +138,8 @@ class Member(TimestampMixin, Base):
     member_no: Mapped[str | None] = mapped_column(String(20), unique=True)
     first_name: Mapped[str] = mapped_column(String(75))
     last_name: Mapped[str] = mapped_column(String(75))
+    first_name_ar: Mapped[str | None] = mapped_column(String(75))
+    last_name_ar: Mapped[str | None] = mapped_column(String(75))
     date_of_birth: Mapped[date | None] = mapped_column(Date)
     gender: Mapped[Gender | None] = mapped_column(db_enum(Gender))
     civil_id: Mapped[str | None] = mapped_column(String(20), unique=True)

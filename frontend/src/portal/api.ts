@@ -43,6 +43,7 @@ export async function portalApi<T = unknown>(url: string, options: { method?: st
 export interface PortalMe {
   kind: "guardian" | "member";
   name: string;
+  name_ar: string | null;
   mobile: string;
 }
 
@@ -56,11 +57,14 @@ export interface FamilyMember {
   id: number;
   first_name: string;
   last_name: string;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
   branch_id: number;
   branch_name: string;
+  branch_name_ar: string | null;
   branch_code: string;
   rank: { belt: BeltBrief; stripes: number; next_belt: BeltBrief | null } | null;
-  next_class: { session_id: number; session_date: string; start_time: string; end_time: string; title: string } | null;
+  next_class: { session_id: number; session_date: string; start_time: string; end_time: string; title: string; title_ar: string | null } | null;
   membership: { id: number; plan_name: string; start_date: string; end_date: string; status: string } | null;
   status: "active" | "expiring" | "expired" | "frozen" | "none";
   expiring: boolean;
@@ -72,17 +76,27 @@ export interface ClassRow {
   start_time: string;
   end_time: string;
   title: string;
+  title_ar: string | null;
   regular: boolean;
   booking: { status: "booked" | "waitlisted" } | null;
   can_book: boolean;
 }
 
 export interface MemberDetail {
-  member: { id: number; first_name: string; last_name: string; branch_name: string; branch_code: string };
+  member: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    first_name_ar: string | null;
+    last_name_ar: string | null;
+    branch_name: string;
+    branch_name_ar: string | null;
+    branch_code: string;
+  };
   status: FamilyMember["status"];
   membership: FamilyMember["membership"];
   classes: ClassRow[];
-  attendance: { session_date: string; start_time: string; title: string; status: string }[];
+  attendance: { session_date: string; start_time: string; title: string; title_ar: string | null; status: string }[];
   renewal: { plan_name: string; price: string } | null;
   receipts: {
     reference: string;
@@ -129,4 +143,13 @@ export interface Renewal {
   status: "pending" | "paid" | "failed";
   end_date: string | null;
   test_outcomes: { approve: string; decline: string } | null;
+}
+
+export interface Account {
+  family: { id: number; first_name: string; last_name: string; first_name_ar: string | null; last_name_ar: string | null }[];
+  email: string | null;
+  mobile: string;
+  service_on: boolean;
+  broadcasts_on: boolean;
+  recent: { at: string; text: string }[];
 }

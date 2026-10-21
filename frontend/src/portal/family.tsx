@@ -1,11 +1,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { portalApi, type FamilyMember, type PortalMe } from "./api";
-import { clock, portalDate, useLang } from "./i18n";
+import { ar, clock, portalDate, useLang } from "./i18n";
 import { AlertIcon, Band, BeltBar, Belt, Illo, Rank, branchKey } from "./ui";
 
 function ChildCard({ row }: { row: FamilyMember }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const first = ar(lang, row.first_name, row.first_name_ar);
   const n = row.next_class;
   const m = row.membership;
   return (
@@ -13,15 +14,15 @@ function ChildCard({ row }: { row: FamilyMember }) {
       <div className="ea-card-body ea-child">
         <div className="ea-child-head">
           <span className="ea-avatar" aria-hidden="true">
-            {row.first_name.slice(0, 1)}
+            {first.slice(0, 1)}
           </span>
           <div style={{ flex: 1 }}>
             <h2 className="ea-h3" style={{ fontSize: 20, lineHeight: "28px" }}>
-              {row.first_name}
+              {first}
             </h2>
             <span className="ea-meta" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
               <i className="ea-branchdot" />
-              {row.branch_name}
+              {ar(lang, row.branch_name, row.branch_name_ar)}
             </span>
           </div>
         </div>
@@ -49,7 +50,7 @@ function ChildCard({ row }: { row: FamilyMember }) {
         <div className="ea-kv">
           <div>
             <span>{t("Next class", "الحصة القادمة")}</span>
-            <b>{n ? `${portalDate(n.session_date)} · ${clock(n.start_time)} · ${n.title}` : "—"}</b>
+            <b>{n ? `${portalDate(n.session_date)} · ${clock(n.start_time)} · ${ar(lang, n.title, n.title_ar)}` : "—"}</b>
           </div>
           <div className={row.expiring ? "is-warn" : undefined}>
             <span>{t("Membership until", "الاشتراك حتى")}</span>
@@ -71,7 +72,7 @@ function ChildCard({ row }: { row: FamilyMember }) {
         <div className="ea-btnrow">
           <Link className={`ea-btn ${row.expiring ? "ea-btn--primary" : "ea-btn--ghost"}`} href={`/portal/member/${row.id}`}>
             {row.expiring ? t("Renew and more", "جدّد والمزيد") : t("Classes, progress and receipts", "الحصص والتقدم والإيصالات")}
-            <span className="ea-sr"> · {row.first_name}</span>
+            <span className="ea-sr"> · {first}</span>
           </Link>
         </div>
       </div>
@@ -96,7 +97,7 @@ export function FamilyPage({ me }: { me: PortalMe }) {
     <>
       <Band
         eyebrow={t("Member portal", "بوابة الأعضاء")}
-        title={lang === "ar" ? `أهلاً ${me.name}` : `Hello${me.name ? `, ${me.name}` : ""}`}
+        title={lang === "ar" ? `أهلاً ${me.name_ar ?? me.name}` : `Hello${me.name ? `, ${me.name}` : ""}`}
         lead={t("Your family's belts, classes, renewals and receipts.", "أحزمة عائلتك وحصصهم وتجديداتهم وإيصالاتهم.")}
       />
       <BeltBar />

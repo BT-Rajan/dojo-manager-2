@@ -8,18 +8,46 @@ messages a family has turned off are logged as skipped and not sent.
 import logging
 from collections import deque
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.models import MessageCategory, MessageLog, MessageStatus
+from app.models import (
+    FamilyPreference,
+    MessageCategory,
+    MessageLog,
+    MessageStatus,
+    MessagingOptIn,
+)
 
 log = logging.getLogger("dojo.messaging")
 _outbox: deque[dict] = deque(maxlen=50)
 
 
 async def service_messages_on(db: AsyncSession, mobile: str) -> bool:
-    # Families can turn service messages off from the portal (phase 5); on until then.
-    return True
+    """Service messages are on unless the family turned them off."""
+    pref = await db.scalar(select(FamilyPreference).where(FamilyPreference.mobile == mobile))
+    return pref is None or pref.service_messages
+
+
+async def set_service_messages(db: AsyncSession, mobile: str, on: bool, user_id=None) -> None:
+    pref = await db.scalar(select(FamilyPreference).where(FamilyPreference.mobile == mobile))
+    if pref is None:
+        db.add(FamilyPreference(mobile=mobile, service_messages=on, updated_by=user_id))
+    else:
+        pref.service_messages = on
+        pref.updated_by = user_id
+
+
+async def opted_in(db: AsyncSession, member_id: int) -> bool:
+    """News and offers: the member's newest choice (none means no)."""
+    latest = await db.scalar(
+        select(MessagingOptIn.opted_in)
+        .where(MessagingOptIn.member_id == member_id)
+        .order_by(MessagingOptIn.at.desc(), MessagingOptIn.id.desc())
+        .limit(1)
+    )
+    return bool(latest)
 
 
 async def send_message(
@@ -49,6 +77,11 @@ async def send_message(
         )
 
     if category == MessageCategory.SERVICE and not await service_messages_on(db, to):
+        logged(MessageStatus.SKIPPED)
+        return False
+    if category == MessageCategory.MARKETING and not (
+        member_id is not None and await opted_in(db, member_id)
+    ):
         logged(MessageStatus.SKIPPED)
         return False
     if get_settings().messaging_backend == "console":

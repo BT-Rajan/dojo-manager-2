@@ -29,6 +29,7 @@ class Branch(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100), unique=True)
+    name_ar: Mapped[str | None] = mapped_column(String(100))
     code: Mapped[str] = mapped_column(String(20), unique=True)
     address: Mapped[str | None] = mapped_column(String(255))
     phone: Mapped[str | None] = mapped_column(String(30))

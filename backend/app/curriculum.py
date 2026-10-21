@@ -309,3 +309,15 @@ SKILLS = {
         ("Traditional / Katas", "All katas mastery"),
     ],
 }
+
+
+# Arabic names shown to families in the member portal.
+BRANCH_NAMES_AR = {"Promenade": "البروميناد", "Bedaya": "بداية"}
+PROGRAM_NAMES_AR = {
+    "Kids Kajukenbo": "كاجوكينبو للأطفال",
+    "Adult Kajukenbo": "كاجوكينبو للكبار",
+    "Kickboxing (All Levels)": "كيك بوكسينغ (جميع المستويات)",
+    "Jiujitsu (All Levels)": "جوجيتسو (جميع المستويات)",
+    "Open Mat / Sparring": "حصة مفتوحة / نزال",
+    "Self-Defence & Traditional Seminar": "ندوة الدفاع عن النفس والتقليدي",
+}

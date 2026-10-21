@@ -19,6 +19,7 @@ class LoginIn(InModel):
 
 class BranchIn(InModel):
     name: Annotated[str, StringConstraints(min_length=1, max_length=100)]
+    name_ar: Annotated[str, StringConstraints(max_length=100)] | None = None
     code: Annotated[str, StringConstraints(min_length=1, max_length=20, pattern=r"^[A-Z0-9_\-]+$")]
     address: ShortText | None = None
     phone: Phone | None = None
@@ -27,6 +28,7 @@ class BranchIn(InModel):
 
 class BranchUpdate(InModel):
     name: Annotated[str, StringConstraints(min_length=1, max_length=100)] | None = None
+    name_ar: Annotated[str, StringConstraints(max_length=100)] | None = None
     address: ShortText | None = None
     phone: Phone | None = None
     is_active: bool | None = None
@@ -41,6 +43,7 @@ class BranchRef(OutModel):
 class BranchOut(OutModel):
     id: int
     name: str
+    name_ar: str | None = None
     code: str
     address: str | None
     phone: str | None

@@ -11,6 +11,8 @@ import { DateInput } from "@/components/common/date-inputs";
 export type MemberFormValues = {
   first_name: string;
   last_name: string;
+  first_name_ar: string;
+  last_name_ar: string;
   phone: string;
   email: string;
   date_of_birth: string;
@@ -29,6 +31,8 @@ export type MemberFormValues = {
 const blank: MemberFormValues = {
   first_name: "",
   last_name: "",
+  first_name_ar: "",
+  last_name_ar: "",
   phone: "",
   email: "",
   date_of_birth: "",
@@ -90,6 +94,12 @@ export function MemberForm({
         </Field>
         <Field label="Last name *">
           <Input required {...text("last_name")} />
+        </Field>
+        <Field label="First name (Arabic)">
+          <Input dir="rtl" {...text("first_name_ar")} />
+        </Field>
+        <Field label="Last name (Arabic)">
+          <Input dir="rtl" {...text("last_name_ar")} />
         </Field>
         <Field label="Mobile / WhatsApp *">
           <Input required inputMode="tel" {...text("phone")} />

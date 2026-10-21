@@ -28,6 +28,7 @@ class Guardian(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     full_name: Mapped[str] = mapped_column(String(150))
+    full_name_ar: Mapped[str | None] = mapped_column(String(150))
     # +965XXXXXXXX: the number they sign in to the portal with.
     mobile: Mapped[str] = mapped_column(String(16), index=True)
     email: Mapped[str | None] = mapped_column(String(255))
@@ -203,3 +204,30 @@ class MembershipFreeze(Base):
     start_date: Mapped[date] = mapped_column(Date)
     end_date: Mapped[date] = mapped_column(Date)
     request_id: Mapped[int | None] = mapped_column(ForeignKey("membership_requests.id"))
+
+
+# ---------------------------------------------------------------- message choices
+class FamilyPreference(Base):
+    """Per family mobile: whether service messages (reminders, test days, progress notes) are
+    sent. Essential messages (sign-in codes, receipts, class changes) always are."""
+
+    __tablename__ = "family_preferences"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    mobile: Mapped[str] = mapped_column(String(16), unique=True)
+    service_messages: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
+    updated_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class MessagingOptIn(Base):
+    """News and offers by WhatsApp: each choice is kept; the newest one counts."""
+
+    __tablename__ = "messaging_opt_ins"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("members.id", ondelete="CASCADE"), index=True)
+    opted_in: Mapped[bool] = mapped_column(Boolean)
+    source: Mapped[str] = mapped_column(String(20))  # portal or desk
+    recorded_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

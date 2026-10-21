@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { portalApi, type MemberDetail } from "./api";
-import { clock, dayLabel, kd, portalDate, useLang } from "./i18n";
+import { ar, clock, dayLabel, kd, portalDate, useLang } from "./i18n";
 import { Belt, Notes } from "./ui";
 
 const METHOD_LABEL = { knet: "KNET", card: "Visa / Mastercard", cash: { en: "Cash", ar: "نقداً" } };
@@ -131,9 +131,11 @@ export function MemberPage({ id }: { id: number }) {
               </Link>
             </p>
             <h1 className="ea-h1">
-              {member.first_name} {member.last_name}
+              {lang === "ar" && member.first_name_ar
+                ? `${member.first_name_ar} ${member.last_name_ar ?? ""}`
+                : `${member.first_name} ${member.last_name}`}
             </h1>
-            <p className="ea-lead">{member.branch_name}</p>
+            <p className="ea-lead">{ar(lang, member.branch_name, member.branch_name_ar)}</p>
           </div>
         </div>
       </section>
@@ -253,7 +255,7 @@ export function MemberPage({ id }: { id: number }) {
                   {data.classes.map((r) => (
                     <div key={r.session_id} className="ea-row">
                       <span>
-                        {dayLabel(r.session_date, lang)} · <span dir="ltr">{clock(r.start_time)}</span> · {r.title}
+                        {dayLabel(r.session_date, lang)} · <span dir="ltr">{clock(r.start_time)}</span> · {ar(lang, r.title, r.title_ar)}
                       </span>
                       {r.regular ? (
                         <span className="ea-meta">{t("Regular class", "حصة منتظمة")}</span>
@@ -281,7 +283,7 @@ export function MemberPage({ id }: { id: number }) {
                   <ul style={{ margin: "8px 0 0", paddingInlineStart: 20 }}>
                     {data.attendance.map((a, i) => (
                       <li key={i}>
-                        {portalDate(a.session_date)} · {a.title}
+                        {portalDate(a.session_date)} · {ar(lang, a.title, a.title_ar)}
                       </li>
                     ))}
                   </ul>

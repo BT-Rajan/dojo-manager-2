@@ -24,6 +24,7 @@ CivilId = Annotated[str, StringConstraints(pattern=r"^[0-9]{12}$")]  # Kuwaiti c
 # ---------------------------------------------------------------- programs
 class ProgramIn(InModel):
     name: Annotated[str, StringConstraints(min_length=1, max_length=100)]
+    name_ar: Annotated[str, StringConstraints(max_length=100)] | None = None
     discipline: Discipline
     description: LongText | None = None
     min_age: Age | None = None
@@ -39,6 +40,7 @@ class ProgramIn(InModel):
 
 class ProgramUpdate(InModel):
     name: Annotated[str, StringConstraints(min_length=1, max_length=100)] | None = None
+    name_ar: Annotated[str, StringConstraints(max_length=100)] | None = None
     discipline: Discipline | None = None
     description: LongText | None = None
     min_age: Age | None = None
@@ -54,6 +56,7 @@ class ProgramOut(OutModel):
     min_age: int | None
     max_age: int | None
     is_active: bool
+    name_ar: str | None = None
 
 
 # ---------------------------------------------------------------- belts
@@ -142,6 +145,8 @@ class InstructorOut(OutModel):
 class _MemberFields(InModel):
     first_name: Annotated[str, StringConstraints(min_length=1, max_length=75)]
     last_name: Annotated[str, StringConstraints(min_length=1, max_length=75)]
+    first_name_ar: Annotated[str, StringConstraints(max_length=75)] | None = None
+    last_name_ar: Annotated[str, StringConstraints(max_length=75)] | None = None
     date_of_birth: date | None = None
     gender: Gender | None = None
     civil_id: CivilId | None = None
@@ -173,6 +178,8 @@ class MemberUpdate(InModel):
     branch_id: int | None = None
     first_name: Annotated[str, StringConstraints(min_length=1, max_length=75)] | None = None
     last_name: Annotated[str, StringConstraints(min_length=1, max_length=75)] | None = None
+    first_name_ar: Annotated[str, StringConstraints(max_length=75)] | None = None
+    last_name_ar: Annotated[str, StringConstraints(max_length=75)] | None = None
     date_of_birth: date | None = None
     gender: Gender | None = None
     civil_id: CivilId | None = None
@@ -196,6 +203,8 @@ class MemberOut(OutModel):
     member_no: str | None
     first_name: str
     last_name: str
+    first_name_ar: str | None = None
+    last_name_ar: str | None = None
     date_of_birth: date | None
     gender: Gender | None
     civil_id: str | None

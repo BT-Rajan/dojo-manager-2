@@ -52,6 +52,7 @@ from app.models.inventory import (
 )
 from app.models.org import AuditLog, Branch, Role, User, UserSession, user_branches
 from app.models.portal import (
+    FamilyPreference,
     Guardian,
     GuardianLink,
     MembershipFreeze,
@@ -59,6 +60,7 @@ from app.models.portal import (
     MessageCategory,
     MessageLog,
     MessageStatus,
+    MessagingOptIn,
     PortalCode,
     PortalSession,
     Relationship,
@@ -94,6 +96,8 @@ from app.models.progress import (
 )
 
 __all__ = [
+    "FamilyPreference",
+    "MessagingOptIn",
     "RULES_VERSION",
     "BeltSkill",
     "Evaluation",

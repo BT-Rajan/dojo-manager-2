@@ -56,7 +56,12 @@ async def test_parent_signs_in_and_sees_only_their_family(owner, branches):
 
     c = await _sign_in()
     me = (await c.get("/api/portal/me")).json()
-    assert me == {"kind": "guardian", "name": "Mariam Ali", "mobile": "+96555551111"}
+    assert me == {
+        "kind": "guardian",
+        "name": "Mariam Ali",
+        "name_ar": None,
+        "mobile": "+96555551111",
+    }
     family = (await c.get("/api/portal/family")).json()
     assert sorted(m["id"] for m in family) == sorted([a["id"], b["id"]])
     assert family[0]["branch_name"] == "Promenade"
@@ -540,6 +545,8 @@ async def test_online_renewal_round_trip(owner, branches):
     assert renewal[0]["reference"] == f"TEST-{ref}"
     msg = (await _messages("renewal_paid"))[-1]
     assert msg.to == "+96555551111" and "تم تجديد" in msg.text
+    # The receipt number in the message is the payment's receipt.
+    assert f"PRM-R{renewal[0]['id']:06d}" in msg.text
     page = (await c.get(url)).json()
     assert len(page["receipts"]) == 2
     assert page["membership"]["end_date"] == body["end_date"]
