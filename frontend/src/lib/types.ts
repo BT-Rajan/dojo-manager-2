@@ -41,6 +41,11 @@ export interface Belt {
   bjj_stripe: string | null;
   bjj_equivalent: string | null;
   seminars_required: number;
+  name_ar: string | null;
+  bjj_stripe_ar: string | null;
+  min_classes: number;
+  min_weeks: number;
+  min_evaluations: number;
 }
 
 export interface Instructor {
@@ -489,4 +494,60 @@ export interface MembershipRequest {
   created_at: string;
   decided_at: string | null;
   decision_note: string | null;
+}
+
+// ---------------------------------------------------------------- progress
+export type Track = "kickboxing" | "jiujitsu" | "self_defence";
+
+export interface BeltSkill {
+  id: number;
+  belt_rank_id: number;
+  track: Track;
+  category: string;
+  name: string;
+  sort_order: number;
+  is_active: boolean;
+}
+
+export interface ProgressNote {
+  id: number;
+  member_id: number;
+  month: string;
+  instructor_id: number | null;
+  worked_on: string;
+  next_steps: string;
+  status: "draft" | "sent";
+  sent_at: string | null;
+}
+
+export interface Consent {
+  id: number;
+  internal_records: boolean;
+  social_media: boolean;
+  website_marketing: boolean;
+  signed_by_name: string;
+  signed_at: string;
+  from_portal: boolean;
+  notes: string | null;
+}
+
+export interface MemberProgress {
+  belt: { id: number; name: string; color: string } | null;
+  stripes: number;
+  next: { id: number; name: string; color: string } | null;
+  since: string | null;
+  classes: number;
+  seminars: number;
+  checks: { code: string; en: string; have: number; need: number; ok: boolean }[];
+  eligible: boolean;
+  skills: { id: number; track: Track; category: string; name: string; checked_on: string | null }[];
+  done: number;
+  total: number;
+  tests: { id: number; title: string; event_date: string }[];
+  evaluations: { id: number; eval_date: string; instructor_name: string | null; notes: string | null; ready_for_test: boolean }[];
+  notes: ProgressNote[];
+  consent: Consent | null;
+  consent_history: Consent[];
+  rules_signed: { rules_version: string; signed_by_name: string; signed_at: string; from_portal: boolean } | null;
+  rules_version: string;
 }

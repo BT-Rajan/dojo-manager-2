@@ -92,6 +92,32 @@ export interface MemberDetail {
     lines: { description: string; amount: string }[];
   }[];
   freeze: { can_request: boolean; pending: boolean; used: boolean } | null;
+  progress: Progress[];
+  consent: { internal_records: boolean; social_media: boolean; website_marketing: boolean } | null;
+  rules_signed: boolean;
+  signer: string;
+}
+
+export interface ProgressBelt {
+  id: number;
+  name: string;
+  name_ar: string | null;
+  color: string;
+  bjj_stripe: string | null;
+  bjj_stripe_ar: string | null;
+}
+
+export interface Progress {
+  belt: ProgressBelt;
+  stripes: number;
+  next: ProgressBelt | null;
+  done: number;
+  total: number;
+  seminars: number;
+  checks: { code: string; en: string; ar: string; have: number; need: number; ok: boolean }[];
+  tests: { event_date: string; title: string }[];
+  evaluations: { eval_date: string; instructor_name: string | null; notes: string | null }[];
+  notes: { month: string; worked_on: string; next_steps: string }[];
 }
 
 export interface Renewal {

@@ -27,6 +27,7 @@ from app.api import (
     portal,
     reports,
     requests,
+    training,
     users,
 )
 from app.core.config import get_settings
@@ -110,6 +111,7 @@ def create_app(frontend_dist: Path | None = None) -> FastAPI:
         coach,
         leads,
         gradings,
+        training,
         operations,
         inventory,
         reports,

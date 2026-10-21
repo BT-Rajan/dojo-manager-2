@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.training import consent_rows, rules_signed
 from app.core.clock import today as academy_today
 from app.core.config import get_settings
 from app.core.deps import DB, utcnow
@@ -26,19 +27,23 @@ from app.core.mobile import normalize_kuwait_mobile
 from app.core.ratelimit import SlidingWindowLimiter
 from app.core.security import hash_token, new_session_token
 from app.models import (
+    RULES_VERSION,
     BeltRank,
     Branch,
     ClassSession,
+    MediaConsent,
     MembershipPlan,
     PortalCode,
     PortalSession,
     Program,
     RenewalPayment,
+    RulesAgreement,
 )
 from app.schemas.portal import (
     BookIn,
     BookOut,
     CompleteIn,
+    ConsentIn,
     FamilyMemberOut,
     FreezeIn,
     MemberDetailOut,
@@ -46,6 +51,7 @@ from app.schemas.portal import (
     RenewalOut,
     RenewIn,
     RenewOut,
+    RulesIn,
     SendCodeIn,
     SendCodeOut,
     VerifyIn,
@@ -53,6 +59,7 @@ from app.schemas.portal import (
 from app.services import portal as ps
 from app.services.audit import audit
 from app.services.messaging import last_message_to, send_message
+from app.services.progress import progress
 
 router = APIRouter(prefix="/portal", tags=["portal"])
 
@@ -373,6 +380,7 @@ async def member_page(member_id: int, session: Family, db: DB) -> dict:
     ]
     current = await ps.current_membership(db, member)
     plan = await ps.renewal_option(db, member)
+    consents = await consent_rows(db, member.id)
     # Freezes are about the membership running now (else the latest one).
     running = info.membership or current
     pending = await ps.pending_freeze_for(db, member)
@@ -391,6 +399,10 @@ async def member_page(member_id: int, session: Family, db: DB) -> dict:
         "attendance": attended,
         "renewal": {"plan_name": plan.name, "price": plan.price} if plan else None,
         "receipts": await ps.receipts(db, member),
+        "progress": _portal_progress(await progress(db, member, academy_today())),
+        "consent": consents[0] if consents else None,
+        "rules_signed": await rules_signed(db, member.id) is not None,
+        "signer": await ps.profile_name(db, session),
         "freeze": {
             "can_request": not running.freeze_used and pending is None,
             "pending": pending is not None,
@@ -490,3 +502,82 @@ async def request_freeze(member_id: int, body: FreezeIn, session: Family, db: DB
     audit(db, None, "freeze_requested", "member", member.id, request_id=req.id)
     await db.commit()
     return {"id": req.id, "status": req.status}
+
+
+# ---------------------------------------------------------------- progress, photos and rules
+def _portal_progress(p: dict | None) -> list[dict]:
+    """The progress card: belt, skills at this belt, next-belt checks, test days, the latest
+    coach notes and monthly notes."""
+    if p is None:
+        return []
+    return [
+        {
+            "belt": p["belt"],
+            "stripes": p["stripes"],
+            "next": p["next"],
+            "done": p["done"],
+            "total": p["total"],
+            "seminars": p["seminars"],
+            "checks": p["checks"],
+            "tests": p["tests"],
+            "evaluations": [e for e in p["evaluations"] if e["notes"]][:3],
+            "notes": p["notes"],
+        }
+    ]
+
+
+@router.post("/members/{member_id}/consent", status_code=status.HTTP_201_CREATED)
+async def set_consent(member_id: int, body: ConsentIn, session: Family, db: DB) -> dict:
+    """The family's photo choices. Each change is kept as a new record; withdrawing takes
+    effect straight away."""
+    member = await ps.member_for(db, session, member_id)
+    consent = MediaConsent(
+        member_id=member.id,
+        internal_records=body.internal,
+        social_media=body.social,
+        website_marketing=body.website,
+        signed_by_name=await ps.profile_name(db, session),
+        signed_at=utcnow(),
+        from_portal=True,
+        notes="Changed by the family in the portal",
+    )
+    db.add(consent)
+    member.media_consent = body.social or body.website
+    await ps.remember_language(db, session, body.lang)
+    audit(db, None, "consent_changed_in_portal", "member", member.id)
+    await db.commit()
+    return {"id": consent.id}
+
+
+@router.post("/members/{member_id}/rules", status_code=status.HTTP_201_CREATED)
+async def sign_rules(member_id: int, body: RulesIn, session: Family, db: DB) -> dict:
+    """Sign the academy rules by ticking the box and typing the registered full name."""
+    member = await ps.member_for(db, session, member_id)
+    ar = body.lang == "ar"
+    if not body.agree:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "ضع علامة على أنك قرأت قواعد الأكاديمية وتوافق عليها."
+            if ar
+            else "Tick that you have read and agree to the academy rules.",
+        )
+    signer = await ps.profile_name(db, session)
+    if body.name.strip().lower() != signer.strip().lower():
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "اكتب اسمك الكامل كما هو مسجّل للتوقيع."
+            if ar
+            else "Type your full name exactly as registered to sign.",
+        )
+    agreement = RulesAgreement(
+        member_id=member.id,
+        rules_version=RULES_VERSION,
+        signed_by_name=body.name.strip(),
+        signature=f"typed:{body.name.strip()}"[:255],
+        signed_at=utcnow(),
+        from_portal=True,
+    )
+    db.add(agreement)
+    audit(db, None, "rules_signed_in_portal", "member", member.id)
+    await db.commit()
+    return {"id": agreement.id}

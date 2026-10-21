@@ -65,6 +65,11 @@ class BeltIn(InModel):
     bjj_stripe: Annotated[str, StringConstraints(max_length=100)] | None = None
     bjj_equivalent: Annotated[str, StringConstraints(max_length=100)] | None = None
     seminars_required: Annotated[int, Field(ge=0, le=100)] = 0
+    name_ar: Annotated[str, StringConstraints(max_length=100)] | None = None
+    bjj_stripe_ar: Annotated[str, StringConstraints(max_length=100)] | None = None
+    min_classes: Annotated[int, Field(ge=0, le=1000)] = 0
+    min_weeks: Annotated[int, Field(ge=0, le=520)] = 0
+    min_evaluations: Annotated[int, Field(ge=0, le=50)] = 0
 
 
 class BeltUpdate(InModel):
@@ -75,6 +80,11 @@ class BeltUpdate(InModel):
     bjj_stripe: Annotated[str, StringConstraints(max_length=100)] | None = None
     bjj_equivalent: Annotated[str, StringConstraints(max_length=100)] | None = None
     seminars_required: Annotated[int, Field(ge=0, le=100)] | None = None
+    name_ar: Annotated[str, StringConstraints(max_length=100)] | None = None
+    bjj_stripe_ar: Annotated[str, StringConstraints(max_length=100)] | None = None
+    min_classes: Annotated[int, Field(ge=0, le=1000)] | None = None
+    min_weeks: Annotated[int, Field(ge=0, le=520)] | None = None
+    min_evaluations: Annotated[int, Field(ge=0, le=50)] | None = None
 
 
 class BeltOut(OutModel):
@@ -86,6 +96,11 @@ class BeltOut(OutModel):
     bjj_stripe: str | None
     bjj_equivalent: str | None
     seminars_required: int
+    name_ar: str | None = None
+    bjj_stripe_ar: str | None = None
+    min_classes: int = 0
+    min_weeks: int = 0
+    min_evaluations: int = 0
 
 
 # ---------------------------------------------------------------- instructors
