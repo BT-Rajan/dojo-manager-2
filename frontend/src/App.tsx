@@ -1,4 +1,5 @@
-import { Route, Switch } from "wouter";
+import { lazy, Suspense } from "react";
+import { Route, Switch, useLocation } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -19,6 +20,9 @@ import NotFound from "@/pages/not-found";
 import Operations from "@/pages/operations";
 import Reports from "@/pages/reports";
 
+// The member and parent portal is a separate app for families, loaded only on /portal.
+const PortalApp = lazy(() => import("@/portal/portal-app"));
+
 const LoadingScreen = () => (
   <div className="flex items-center justify-center min-h-screen bg-background">
     <div className="text-center">
@@ -29,6 +33,18 @@ const LoadingScreen = () => (
 );
 
 function Router() {
+  const [location] = useLocation();
+  if (location === "/portal" || location.startsWith("/portal/")) {
+    return (
+      <Suspense fallback={null}>
+        <PortalApp />
+      </Suspense>
+    );
+  }
+  return <StaffRouter />;
+}
+
+function StaffRouter() {
   const { isAuthenticated, isLoading } = useAuth();
   if (isLoading) return <LoadingScreen />;
   if (!isAuthenticated) return <Login />;

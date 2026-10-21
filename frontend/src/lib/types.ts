@@ -441,3 +441,15 @@ export interface PortalAccess {
   user_active: boolean | null;
   last_login_at: string | null;
 }
+
+// ---------------------------------------------------------------- member portal families
+export interface GuardianLink {
+  guardian_id: number;
+  member_id: number;
+  full_name: string;
+  mobile: string;
+  email: string | null;
+  relationship: string;
+  is_primary: boolean;
+  other_member_ids: number[];
+}

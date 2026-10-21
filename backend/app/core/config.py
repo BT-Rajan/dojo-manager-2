@@ -45,6 +45,18 @@ class Settings(BaseSettings):
     login_max_attempts: int = 10
     login_window_seconds: int = 300
 
+    # Member and parent portal: sign-in by mobile number and a 4-digit WhatsApp code.
+    portal_cookie_name: str = "dojo_portal"
+    portal_session_ttl_hours: int = 24 * 14
+    portal_code_ttl_seconds: int = 300
+    portal_code_max_attempts: int = 5
+    # Key for hashing sign-in codes. Set it in production; when empty, a random key is made at
+    # start-up (codes then stop working across restarts).
+    portal_secret: SecretStr | None = None
+    # WhatsApp / SMS provider. "console": development and tests; messages are logged and the
+    # portal shows the last code on screen outside production.
+    messaging_backend: str = Field(default="console", pattern="^(console)$")
+
     # Initial owner account, created by ``python -m app.seed`` when no users exist.
     bootstrap_owner_username: str = "owner"
     bootstrap_owner_password: SecretStr | None = None

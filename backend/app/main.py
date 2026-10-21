@@ -15,6 +15,7 @@ from app.api import (
     classes,
     coach,
     gradings,
+    guardians,
     instructors,
     inventory,
     leads,
@@ -22,6 +23,7 @@ from app.api import (
     memberships,
     operations,
     payments,
+    portal,
     reports,
     users,
 )
@@ -98,6 +100,7 @@ def create_app(frontend_dist: Path | None = None) -> FastAPI:
         catalog,
         instructors,
         members,
+        guardians,
         memberships,
         payments,
         classes,
@@ -107,6 +110,7 @@ def create_app(frontend_dist: Path | None = None) -> FastAPI:
         operations,
         inventory,
         reports,
+        portal,
     )
     for module in modules:
         api.include_router(module.router)

@@ -29,6 +29,14 @@ gradings and seminars, front-desk operations, and inventory.
   (every class, who teaches it, who is on leave), and their week (Saturday to Friday) with the
   weekly timetable. Classes they cover and classes covered for them are marked. Staff can open
   any coach's portal at their branches.
+- **Member and parent portal** (`/portal`, English and Arabic): families sign in with their
+  mobile number and a 4-digit WhatsApp code (no passwords) and see each child's belt and
+  stripes, next class and membership (with "renew soon" warnings). Parents are linked to
+  members on the member page (Family and portal); siblings registered with the same parent
+  mobile share one family. Adult members sign in with their own mobile. Codes are stored
+  hashed, expire after 5 minutes and allow 5 attempts; 3 codes per number per 15 minutes and
+  10 per address per hour; the answer is the same for unknown numbers. Until WhatsApp is
+  connected, messages are logged and the code is shown on screen outside production.
 - **Leads**: enquiry → contacted → trial booked → attended → member (or lost, with reason).
 - **Gradings & seminars**: Kajukenbo belt system (belt = rank + kickboxing level, stripe =
   grappling level, seminar points required), grading events that promote passing students,

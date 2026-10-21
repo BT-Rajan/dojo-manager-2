@@ -134,6 +134,9 @@ class Member(TimestampMixin, Base):
     gender: Mapped[Gender | None] = mapped_column(db_enum(Gender))
     civil_id: Mapped[str | None] = mapped_column(String(20), unique=True)
     phone: Mapped[str] = mapped_column(String(30), index=True)
+    # ``phone`` as +965XXXXXXXX when it is a Kuwait mobile: adult members sign in to the
+    # portal with it. Kept in step with ``phone`` by the API.
+    portal_mobile: Mapped[str | None] = mapped_column(String(16), index=True)
     email: Mapped[str | None] = mapped_column(String(255))
     guardian_name: Mapped[str | None] = mapped_column(String(150))
     guardian_phone: Mapped[str | None] = mapped_column(String(30))

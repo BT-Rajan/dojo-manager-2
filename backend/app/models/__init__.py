@@ -49,6 +49,16 @@ from app.models.inventory import (
     VendorType,
 )
 from app.models.org import AuditLog, Branch, Role, User, UserSession, user_branches
+from app.models.portal import (
+    Guardian,
+    GuardianLink,
+    MessageCategory,
+    MessageLog,
+    MessageStatus,
+    PortalCode,
+    PortalSession,
+    Relationship,
+)
 from app.models.progress import (
     CaseStatus,
     Channel,
@@ -67,6 +77,14 @@ from app.models.progress import (
 )
 
 __all__ = [
+    "Guardian",
+    "GuardianLink",
+    "MessageCategory",
+    "MessageLog",
+    "MessageStatus",
+    "PortalCode",
+    "PortalSession",
+    "Relationship",
     "CountStatus",
     "GoodsReceipt",
     "GoodsReceiptLine",

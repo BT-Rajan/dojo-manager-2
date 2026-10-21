@@ -5,6 +5,7 @@ import { Pencil, Phone, Plus } from "lucide-react";
 import { Page } from "@/components/layout/page";
 import { BeltSwatch, Empty, EnumSelect, Field, Loading, RecordSelect, StatusBadge } from "@/components/common";
 import { MemberForm, toPayload } from "@/components/common/member-form";
+import { FamilyCard } from "@/components/members/family-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -102,6 +103,7 @@ export default function MemberDetail() {
       }
     >
       <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>Profile</CardTitle>
@@ -138,6 +140,8 @@ export default function MemberDetail() {
             {member.notes && <p className="text-muted-foreground">{member.notes}</p>}
           </CardContent>
         </Card>
+        <FamilyCard member={member} />
+        </div>
 
         <Card className="lg:col-span-2">
           <CardContent className="pt-6">
