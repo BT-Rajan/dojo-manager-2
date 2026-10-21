@@ -12,7 +12,8 @@ import { fmtDate, fmtTime } from "@/lib/format";
 import { api } from "@/lib/queryClient";
 import type { AttendanceRow, AttendanceStatus, ClassSession, Member } from "@/lib/types";
 
-const ATT_STATUSES: AttendanceStatus[] = ["booked", "present", "late", "absent", "excused"];
+const ATT_STATUSES: AttendanceStatus[] = ["booked", "present", "late", "absent", "excused", "waitlisted", "cancelled"];
+const HOLDS_PLACE = ["booked", "present", "late"];
 
 /** Book members into a class and mark who came; staff can also cancel the class. */
 export function AttendanceDialog({ session, onClose }: { session: ClassSession; onClose: () => void }) {
@@ -53,7 +54,8 @@ export function AttendanceDialog({ session, onClose }: { session: ClassSession; 
       ) : (
         <>
           <p className="text-sm text-muted-foreground">
-            {rows.filter((r) => ["booked", "present", "late"].includes(r.status)).length} / {session.capacity} places taken
+            {rows.filter((r) => r.is_regular || HOLDS_PLACE.includes(r.status ?? "")).length} / {session.capacity} places taken
+            {rows.some((r) => r.status === "waitlisted") && ` · ${rows.filter((r) => r.status === "waitlisted").length} on the waiting list`}
           </p>
           <div className="flex gap-2">
             <Input placeholder="Find member to add (name or phone)" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -90,9 +92,14 @@ export function AttendanceDialog({ session, onClose }: { session: ClassSession; 
           </TableHeader>
           <TableBody>
             {rows.map((r) => (
-              <TableRow key={r.id}>
+              <TableRow key={r.member_id} className={r.status === "cancelled" ? "opacity-60" : undefined}>
                 <TableCell>
                   {r.member.first_name} {r.member.last_name}
+                  <span className="ml-2 inline-flex flex-wrap gap-1 align-middle">
+                    {r.is_regular && <StatusBadge status="regular" />}
+                    {r.source === "portal" && <StatusBadge status="portal" />}
+                    {r.late_cancellation && <span className="text-xs text-warning">late cancellation</span>}
+                  </span>
                 </TableCell>
                 <TableCell>
                   {r.has_active_membership ? (
@@ -103,10 +110,11 @@ export function AttendanceDialog({ session, onClose }: { session: ClassSession; 
                 </TableCell>
                 <TableCell>
                   {cancelled ? (
-                    <StatusBadge status={r.status} />
+                    r.status ? <StatusBadge status={r.status} /> : <span className="text-xs text-muted-foreground">Regular</span>
                   ) : (
                     <EnumSelect
-                      value={r.status}
+                      value={r.status ?? undefined}
+                      placeholder="Not checked in"
                       onChange={(s) => record.mutate([{ member_id: r.member_id, status: s as AttendanceStatus }])}
                       options={ATT_STATUSES}
                     />

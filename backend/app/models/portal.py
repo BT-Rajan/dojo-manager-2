@@ -29,6 +29,8 @@ class Guardian(TimestampMixin, Base):
     # +965XXXXXXXX: the number they sign in to the portal with.
     mobile: Mapped[str] = mapped_column(String(16), index=True)
     email: Mapped[str | None] = mapped_column(String(255))
+    # Language for WhatsApp messages: the one they last used in the portal (Arabic until then).
+    language: Mapped[str] = mapped_column(String(2), default="ar", server_default="ar")
 
     links: Mapped[list["GuardianLink"]] = orm_relationship(
         back_populates="guardian", cascade="all, delete-orphan", lazy="raise"

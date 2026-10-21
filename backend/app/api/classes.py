@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import Select, case, delete, func, select, update
+from sqlalchemy import Select, case, func, select, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.orm import selectinload
 
@@ -49,6 +49,12 @@ from app.schemas.classes import (
     SessionUpdate,
     SessionWithCounts,
 )
+from app.services.bookings import (
+    places_taken,
+    promote_waitlist,
+    regular_member_ids,
+    regulars_by_session,
+)
 
 router = APIRouter(tags=["classes"])
 any_role = [require_roles(*ANY_ROLE)]
@@ -90,10 +96,27 @@ def sessions_with_counts() -> Select:
 
 
 async def session_dicts(db: DB, stmt: Select) -> list[dict]:
+    """Rows of ``sessions_with_counts``. ``booked`` is the places taken: regular members plus
+    everyone else booked or checked in."""
+    rows = (await db.execute(stmt)).all()
+    sessions = [sess for sess, _, _ in rows]
+    regulars = await regulars_by_session(db, sessions)
+    holding: dict[int, set[int]] = {}
+    if any(regulars.values()):
+        pairs = await db.execute(
+            select(Attendance.session_id, Attendance.member_id).where(
+                Attendance.session_id.in_([s.id for s in sessions]),
+                Attendance.status.in_(ATTENDING),
+            )
+        )
+        for sid, mid in pairs.all():
+            holding.setdefault(sid, set()).add(mid)
     out = []
-    for sess, booked, attended in (await db.execute(stmt)).all():
+    for sess, booked, attended in rows:
         row = SessionOut.model_validate(sess).model_dump()
-        out.append(row | {"booked": int(booked), "attended": int(attended)})
+        regular = regulars.get(sess.id, set())
+        taken = len(regular | holding.get(sess.id, set())) if regular else int(booked)
+        out.append(row | {"booked": taken, "attended": int(attended)})
     return out
 
 
@@ -278,19 +301,45 @@ async def _active_member_ids(db: DB, member_ids: list[int], on: date) -> set[int
 
 
 async def _attendance_rows(db: DB, sess: ClassSession) -> list[dict]:
+    """The class roster: regular members first (with or without a check-in yet), then
+    bookings, the waiting list in order, and cancellations."""
     records = list(
         await db.scalars(
             select(Attendance)
             .where(Attendance.session_id == sess.id)
             .options(selectinload(Attendance.member))
-            .order_by(Attendance.id)
+            .order_by(Attendance.booked_at, Attendance.id)
         )
     )
-    active = await _active_member_ids(db, [a.member_id for a in records], sess.session_date)
-    return [
-        AttendanceOut.model_validate(a).model_dump()
-        | {"has_active_membership": a.member_id in active}
+    regulars = await regular_member_ids(db, sess)
+    recorded = {a.member_id for a in records}
+    missing = regulars - recorded
+    members = (
+        list(await db.scalars(select(Member).where(Member.id.in_(missing)))) if missing else []
+    )
+    ids = list(recorded | missing)
+    active = await _active_member_ids(db, ids, sess.session_date)
+    rows = [
+        {
+            "id": None,
+            "session_id": sess.id,
+            "member_id": m.id,
+            "status": None,
+            "checked_in_at": None,
+            "member": m,
+            "is_regular": True,
+        }
+        for m in sorted(members, key=lambda m: (m.first_name, m.last_name))
+    ] + [
+        AttendanceOut.model_validate(a).model_dump() | {"is_regular": a.member_id in regulars}
         for a in records
+    ]
+    order = {None: 0, AttendanceStatus.WAITLISTED: 2, AttendanceStatus.CANCELLED: 3}
+    rows.sort(key=lambda r: (not r["is_regular"], order.get(r["status"], 1)))
+    return [
+        AttendanceOut.model_validate(r).model_dump()
+        | {"has_active_membership": r["member_id"] in active}
+        for r in rows
     ]
 
 
@@ -323,6 +372,13 @@ async def record_attendance(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown member_id")
 
     now = utcnow()
+    freed = await db.scalar(
+        select(func.count()).where(
+            Attendance.session_id == sess.id,
+            Attendance.member_id.in_(entries),
+            Attendance.status == AttendanceStatus.BOOKED,
+        )
+    )
     stmt = mysql_insert(Attendance).values(
         [
             {
@@ -331,6 +387,8 @@ async def record_attendance(
                 "status": st,
                 "checked_in_at": now if st in PRESENT else None,
                 "recorded_by": user.id,
+                "booked_at": now,
+                "cancelled_at": now if st == AttendanceStatus.CANCELLED else None,
             }
             for mid, st in entries.items()
         ]
@@ -339,16 +397,15 @@ async def record_attendance(
         status=stmt.inserted.status,
         checked_in_at=func.coalesce(Attendance.checked_in_at, stmt.inserted.checked_in_at),
         recorded_by=stmt.inserted.recorded_by,
+        cancelled_at=stmt.inserted.cancelled_at,
     )
     await db.execute(stmt)
-    taken = await db.scalar(
-        select(func.count()).where(
-            Attendance.session_id == sess.id, Attendance.status.in_(ATTENDING)
-        )
-    )
-    if taken > capacity:
+    if await places_taken(db, sess) > capacity:
         await db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, f"Class is full ({capacity})")
+    if freed:
+        # A booked member marked absent, excused or cancelled frees their place.
+        await promote_waitlist(db, sess)
     await db.commit()
     return await _attendance_rows(db, sess)
 
@@ -357,12 +414,21 @@ async def record_attendance(
     "/sessions/{session_id}/attendance/{member_id}", status_code=204, dependencies=any_role
 )
 async def remove_attendance(session_id: int, member_id: int, user: CurrentUser, db: DB) -> None:
-    await get_scoped_or_404(db, ClassSession, session_id, user)
-    await db.execute(
-        delete(Attendance).where(
+    """Remove a booking (or a wrong check-in). A booked place freed this way goes to the
+    waiting list."""
+    sess = await get_scoped_or_404(db, ClassSession, session_id, user)
+    await db.refresh(sess, with_for_update=True)
+    row = await db.scalar(
+        select(Attendance).where(
             Attendance.session_id == session_id, Attendance.member_id == member_id
         )
     )
+    if row is not None:
+        had_place = row.status == AttendanceStatus.BOOKED
+        await db.delete(row)
+        await db.flush()
+        if had_place and sess.status == SessionStatus.SCHEDULED:
+            await promote_waitlist(db, sess)
     await db.commit()
 
 

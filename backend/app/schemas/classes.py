@@ -3,7 +3,14 @@ from typing import Annotated
 
 from pydantic import EmailStr, Field, StringConstraints, model_validator
 
-from app.models.classes import AttendanceStatus, LeadSource, LeadStatus, LeaveType, SessionStatus
+from app.models.classes import (
+    AttendanceStatus,
+    BookingSource,
+    LeadSource,
+    LeadStatus,
+    LeaveType,
+    SessionStatus,
+)
 from app.schemas.common import InModel, LongText, Name, OutModel, Phone, ShortText
 from app.schemas.dojo import MemberBrief
 
@@ -141,13 +148,17 @@ class AttendanceBulkIn(InModel):
 
 
 class AttendanceOut(OutModel):
-    id: int
+    # None for a regular member who has no booking or check-in for this class yet.
+    id: int | None
     session_id: int
     member_id: int
-    status: AttendanceStatus
+    status: AttendanceStatus | None
     checked_in_at: datetime | None
     member: MemberBrief
     has_active_membership: bool = False
+    is_regular: bool = False
+    source: BookingSource = BookingSource.DESK
+    late_cancellation: bool = False
 
 
 class MemberAttendanceOut(OutModel):

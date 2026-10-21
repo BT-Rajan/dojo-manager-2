@@ -33,6 +33,13 @@ class AttendanceStatus(enum.StrEnum):
     LATE = "late"
     ABSENT = "absent"
     EXCUSED = "excused"
+    WAITLISTED = "waitlisted"  # the class was full: first in line gets the next free place
+    CANCELLED = "cancelled"  # booking cancelled (by the family or the desk)
+
+
+class BookingSource(enum.StrEnum):
+    DESK = "desk"
+    PORTAL = "portal"
 
 
 class LeaveType(enum.StrEnum):
@@ -129,8 +136,37 @@ class Attendance(Base):
     status: Mapped[AttendanceStatus] = mapped_column(db_enum(AttendanceStatus))
     checked_in_at: Mapped[datetime | None] = mapped_column(DateTime)
     recorded_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    source: Mapped[BookingSource] = mapped_column(
+        db_enum(BookingSource), default=BookingSource.DESK, server_default="desk"
+    )
+    # When the place (or waiting-list spot) was taken: the waiting list is served in this order.
+    booked_at: Mapped[datetime | None] = mapped_column(DateTime)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # Cancelled less than 2 hours before the class. Recorded only; no penalty.
+    late_cancellation: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
     member: Mapped[Member] = relationship(lazy="raise")
+
+
+class Enrollment(TimestampMixin, Base):
+    """A member's regular weekly class: they have a place every week without booking."""
+
+    __tablename__ = "class_enrollments"
+    __table_args__ = (
+        CheckConstraint("end_date IS NULL OR end_date >= start_date", name="date_order"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("members.id", ondelete="CASCADE"), index=True)
+    schedule_id: Mapped[int] = mapped_column(
+        ForeignKey("class_schedules.id", ondelete="CASCADE"), index=True
+    )
+    start_date: Mapped[date] = mapped_column(Date)
+    end_date: Mapped[date | None] = mapped_column(Date)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+    def active_on(self, day: date) -> bool:
+        return self.start_date <= day and (self.end_date is None or day <= self.end_date)
 
 
 class InstructorLeave(TimestampMixin, Base):

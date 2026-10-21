@@ -6,6 +6,7 @@ import { Page } from "@/components/layout/page";
 import { BeltSwatch, Empty, EnumSelect, Field, Loading, RecordSelect, StatusBadge } from "@/components/common";
 import { MemberForm, toPayload } from "@/components/common/member-form";
 import { FamilyCard } from "@/components/members/family-card";
+import { RegularClassesCard } from "@/components/members/regular-classes-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -141,6 +142,7 @@ export default function MemberDetail() {
           </CardContent>
         </Card>
         <FamilyCard member={member} />
+        <RegularClassesCard member={member} />
         </div>
 
         <Card className="lg:col-span-2">
