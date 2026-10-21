@@ -83,4 +83,24 @@ export interface MemberDetail {
   membership: FamilyMember["membership"];
   classes: ClassRow[];
   attendance: { session_date: string; start_time: string; title: string; status: string }[];
+  renewal: { plan_name: string; price: string } | null;
+  receipts: {
+    reference: string;
+    paid_at: string;
+    amount: string;
+    method: "knet" | "card" | "cash";
+    lines: { description: string; amount: string }[];
+  }[];
+  freeze: { can_request: boolean; pending: boolean; used: boolean } | null;
+}
+
+export interface Renewal {
+  reference: string;
+  member_id: number;
+  plan_name: string;
+  amount: string;
+  method: "knet" | "card";
+  status: "pending" | "paid" | "failed";
+  end_date: string | null;
+  test_outcomes: { approve: string; decline: string } | null;
 }

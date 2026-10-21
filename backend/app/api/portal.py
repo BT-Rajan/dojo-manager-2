@@ -29,16 +29,23 @@ from app.models import (
     BeltRank,
     Branch,
     ClassSession,
+    MembershipPlan,
     PortalCode,
     PortalSession,
     Program,
+    RenewalPayment,
 )
 from app.schemas.portal import (
     BookIn,
     BookOut,
+    CompleteIn,
     FamilyMemberOut,
+    FreezeIn,
     MemberDetailOut,
     PortalMe,
+    RenewalOut,
+    RenewIn,
+    RenewOut,
     SendCodeIn,
     SendCodeOut,
     VerifyIn,
@@ -364,6 +371,11 @@ async def member_page(member_id: int, session: Family, db: DB) -> dict:
         }
         for s, a in await ps.recent_attendance(db, member)
     ]
+    current = await ps.current_membership(db, member)
+    plan = await ps.renewal_option(db, member)
+    # Freezes are about the membership running now (else the latest one).
+    running = info.membership or current
+    pending = await ps.pending_freeze_for(db, member)
     return {
         "member": {
             "id": member.id,
@@ -373,9 +385,19 @@ async def member_page(member_id: int, session: Family, db: DB) -> dict:
             "branch_code": branch.code,
         },
         "status": info.code,
-        "membership": _membership_brief(info.membership),
+        # The latest membership, so a renewal shows its new end date straight away.
+        "membership": _membership_brief(current),
         "classes": classes,
         "attendance": attended,
+        "renewal": {"plan_name": plan.name, "price": plan.price} if plan else None,
+        "receipts": await ps.receipts(db, member),
+        "freeze": {
+            "can_request": not running.freeze_used and pending is None,
+            "pending": pending is not None,
+            "used": running.freeze_used,
+        }
+        if running
+        else None,
     }
 
 
@@ -393,3 +415,78 @@ async def cancel_class(member_id: int, body: BookIn, session: Family, db: DB) ->
     row = await ps.cancel(db, session, member, body.session_id, body.lang)
     await db.commit()
     return {"status": row.status, "late_cancellation": row.late_cancellation}
+
+
+# ---------------------------------------------------------------- renewals and freezes
+async def _renewal_for(db: AsyncSession, session: PortalSession, reference: str) -> RenewalPayment:
+    """A renewal started by this family (found by its reference, never by id alone)."""
+    payment = await db.scalar(select(RenewalPayment).where(RenewalPayment.reference == reference))
+    if payment is None or (
+        payment.guardian_id != session.guardian_id or payment.by_member_id != session.member_id
+    ):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Renewal not found")
+    return payment
+
+
+async def _renewal_out(db: AsyncSession, payment: RenewalPayment) -> dict:
+    from app.models import Membership
+    from app.services.payments import get_gateway
+
+    plan = await db.get(MembershipPlan, payment.plan_id)
+    ms = await db.get(Membership, payment.membership_id) if payment.membership_id else None
+    gateway = get_gateway()
+    test = None
+    if gateway.name == "test" and payment.status == "pending":
+        test = {o: gateway.signature(payment.reference, o) for o in ("approve", "decline")}
+    return {
+        "reference": payment.reference,
+        "member_id": payment.member_id,
+        "plan_name": plan.name,
+        "amount": payment.amount,
+        "method": payment.method,
+        "status": payment.status,
+        "end_date": ms.end_date if ms else None,
+        "test_outcomes": test,
+    }
+
+
+@router.post("/members/{member_id}/renew", response_model=RenewOut)
+async def renew(member_id: int, body: RenewIn, session: Family, db: DB) -> dict:
+    """Start an online renewal; the family is sent to the payment page."""
+    from app.services.payments import get_gateway
+
+    member = await ps.member_for(db, session, member_id)
+    payment = await ps.start_renewal(db, session, member, body.method)
+    await ps.remember_language(db, session, body.lang)
+    await db.commit()
+    return {"reference": payment.reference, "pay_url": get_gateway().start(payment)}
+
+
+@router.get("/renewals/{reference}", response_model=RenewalOut)
+async def renewal(reference: str, session: Family, db: DB) -> dict:
+    return await _renewal_out(db, await _renewal_for(db, session, reference))
+
+
+@router.post("/renewals/{reference}/complete", response_model=RenewalOut)
+async def complete_renewal(reference: str, body: CompleteIn, session: Family, db: DB) -> dict:
+    """The payment page's answer. Only a correctly signed answer counts; a repeat changes
+    nothing."""
+    from app.services.payments import get_gateway
+
+    payment = await _renewal_for(db, session, reference)
+    paid, gateway_ref = get_gateway().verify(payment, body.outcome, body.sig)
+    payment = await ps.complete_renewal(db, payment, paid, gateway_ref)
+    if payment.status == "paid":
+        audit(db, None, "online_renewal", "member", payment.member_id, reference=reference)
+    await db.commit()
+    return await _renewal_out(db, payment)
+
+
+@router.post("/members/{member_id}/freeze", status_code=status.HTTP_201_CREATED)
+async def request_freeze(member_id: int, body: FreezeIn, session: Family, db: DB) -> dict:
+    member = await ps.member_for(db, session, member_id)
+    req = await ps.request_freeze(db, member, body.start_date, body.weeks, body.reason)
+    await ps.remember_language(db, session, body.lang)
+    audit(db, None, "freeze_requested", "member", member.id, request_id=req.id)
+    await db.commit()
+    return {"id": req.id, "status": req.status}

@@ -5,6 +5,7 @@ import { AccountPage } from "./account";
 import { FamilyPage } from "./family";
 import { useLang } from "./i18n";
 import { MemberPage, NotInFamily } from "./member-page";
+import { PaymentPage, RenewalReturn } from "./payment";
 import { PortalShell } from "./shell";
 import { SignIn } from "./sign-in";
 
@@ -49,6 +50,20 @@ export default function PortalApp() {
         {(p) => (
           <PortalShell title={t("Member portal", "بوابة الأعضاء")}>
             <MemberPage id={Number(p.id)} />
+          </PortalShell>
+        )}
+      </Route>
+      <Route path="/portal/pay/:reference">
+        {(p) => (
+          <PortalShell title={t("Payment", "الدفع")}>
+            <PaymentPage reference={p.reference} />
+          </PortalShell>
+        )}
+      </Route>
+      <Route path="/portal/renewal/:reference">
+        {(p) => (
+          <PortalShell title={t("Payment", "الدفع")}>
+            <RenewalReturn reference={p.reference} />
           </PortalShell>
         )}
       </Route>

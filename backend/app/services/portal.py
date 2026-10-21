@@ -15,14 +15,23 @@ from app.models import (
     Attendance,
     AttendanceStatus,
     BookingSource,
+    Branch,
     ClassSession,
     Guardian,
     GuardianLink,
     Member,
     Membership,
+    MembershipFreeze,
+    MembershipPlan,
+    MembershipRequest,
     MembershipStatus,
     MemberStatus,
+    Payment,
     PortalSession,
+    RenewalPayment,
+    RenewalStatus,
+    RequestKind,
+    RequestStatus,
     SessionStatus,
 )
 from app.models.base import utcnow
@@ -115,6 +124,20 @@ class MemberStatusInfo:
     membership: Membership | None
 
 
+async def frozen_on(db: AsyncSession, membership_ids: list[int], day: date) -> set[int]:
+    """Which of these memberships are inside an approved freeze on ``day``."""
+    if not membership_ids:
+        return set()
+    rows = await db.scalars(
+        select(MembershipFreeze.membership_id).where(
+            MembershipFreeze.membership_id.in_(membership_ids),
+            MembershipFreeze.start_date <= day,
+            MembershipFreeze.end_date >= day,
+        )
+    )
+    return set(rows)
+
+
 async def member_status(db: AsyncSession, member: Member, today: date) -> MemberStatusInfo:
     items = list(
         await db.scalars(
@@ -127,6 +150,9 @@ async def member_status(db: AsyncSession, member: Member, today: date) -> Member
         )
     )
     covering = [m for m in items if m.start_date <= today <= m.end_date]
+    frozen = await frozen_on(db, [m.id for m in covering], today)
+    if frozen:
+        return MemberStatusInfo("frozen", next(m for m in covering if m.id in frozen))
     if member.status == MemberStatus.FROZEN:
         return MemberStatusInfo(
             "frozen", covering[0] if covering else (items[0] if items else None)
@@ -171,8 +197,10 @@ async def membership_for_class(
         )
     )
     covering = [m for m in items if m.start_date <= day <= m.end_date]
-    if member.status == MemberStatus.FROZEN or any(
-        m.status == MembershipStatus.FROZEN for m in covering
+    if (
+        member.status == MemberStatus.FROZEN
+        or any(m.status == MembershipStatus.FROZEN for m in covering)
+        or await frozen_on(db, [m.id for m in covering], day)
     ):
         return None, "frozen"
     usable = [m for m in covering if m.status == MembershipStatus.ACTIVE]
@@ -361,3 +389,233 @@ async def cancel(
     await remember_language(db, session, lang)
     await cancel_booking(db, cls, row)
     return row
+
+
+# ---------------------------------------------------------------- money
+FREEZE_MIN_WEEKS, FREEZE_MAX_WEEKS = 1, 4
+
+
+async def current_membership(db: AsyncSession, member: Member) -> Membership | None:
+    return await db.scalar(
+        select(Membership)
+        .where(Membership.member_id == member.id, Membership.status != MembershipStatus.CANCELLED)
+        .order_by(Membership.end_date.desc(), Membership.id.desc())
+        .limit(1)
+    )
+
+
+async def renewal_option(db: AsyncSession, member: Member) -> MembershipPlan | None:
+    """The plan the member can renew online: the current membership's plan, while it is still
+    offered at their branch."""
+    from app.services.payments import online_payments_enabled
+
+    m = await current_membership(db, member)
+    if m is None or not online_payments_enabled():
+        return None
+    plan = m.plan
+    if not plan.is_active or plan.branch_id not in (None, member.branch_id):
+        return None
+    return plan
+
+
+async def start_renewal(
+    db: AsyncSession, session: PortalSession, member: Member, method: str
+) -> RenewalPayment:
+    plan = await renewal_option(db, member)
+    if plan is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "This membership can't be renewed online — please contact the branch.",
+        )
+    if method not in ("knet", "card"):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Choose KNET or card.")
+    payment = RenewalPayment(
+        member_id=member.id,
+        plan_id=plan.id,
+        amount=plan.price,
+        method=method,
+        guardian_id=session.guardian_id,
+        by_member_id=session.member_id,
+    )
+    db.add(payment)
+    await db.flush()
+    return payment
+
+
+def receipt_ref(branch_code: str, payment_id: int) -> str:
+    return f"{branch_code}-R{payment_id:06d}"
+
+
+MONEY_MESSAGES = {
+    "renewal_paid": (
+        "Thank you! {member}'s membership is renewed until {end}. Receipt {receipt}. "
+        "— Elite Academy",
+        "شكراً لك! تم تجديد اشتراك {member} حتى {end}. الإيصال {receipt}. — أكاديمية إيليت",
+    ),
+}
+
+
+async def complete_renewal(
+    db: AsyncSession, payment: RenewalPayment, paid: bool, gateway_reference: str
+) -> RenewalPayment:
+    """Record the gateway's answer once: a paid renewal becomes a membership (continuing from
+    the current end date) with its KNET / card payment, and the family gets a receipt."""
+    from app.schemas.dojo import InlinePayment, MembershipIn
+    from app.services.memberships import create_membership
+
+    await db.refresh(payment, with_for_update=True)
+    if payment.status != RenewalStatus.PENDING:
+        return payment
+    if not paid:
+        payment.status = RenewalStatus.FAILED
+        return payment
+    member = await db.get(Member, payment.member_id)
+    body = MembershipIn(
+        member_id=member.id,
+        plan_id=payment.plan_id,
+        price=payment.amount,
+        notes=f"Online renewal {payment.reference}",
+        payment=InlinePayment(method=payment.method, reference=gateway_reference[:100]),
+    )
+    membership = await create_membership(db, member, body, None)
+    pay = await db.scalar(select(Payment).where(Payment.membership_id == membership.id))
+    payment.status = RenewalStatus.PAID
+    payment.paid_at = utcnow()
+    payment.gateway_reference = gateway_reference[:80]
+    payment.membership_id = membership.id
+    payment.payment_id = pay.id if pay else None
+    branch = await db.get(Branch, member.branch_id)
+    mobile, lang = await contact(db, member)
+    if mobile:
+        en, ar = MONEY_MESSAGES["renewal_paid"]
+        text = (ar if lang == "ar" else en).format(
+            member=f"{member.first_name} {member.last_name}",
+            end=f"{membership.end_date:%d/%m/%Y}",
+            receipt=receipt_ref(branch.code, pay.id) if pay else payment.reference,
+        )
+        await send_message(db, mobile, text, kind="renewal_paid", member_id=member.id)
+    return payment
+
+
+async def receipts(db: AsyncSession, member: Member, limit: int = 10) -> list[dict]:
+    branch = await db.get(Branch, member.branch_id)
+    rows = await db.execute(
+        select(Payment, Membership)
+        .outerjoin(Membership, Membership.id == Payment.membership_id)
+        .where(Payment.member_id == member.id, Payment.is_void.is_(False))
+        .order_by(Payment.paid_at.desc(), Payment.id.desc())
+        .limit(limit)
+    )
+    out = []
+    for p, ms in rows.all():
+        line = ms.plan.name if ms else str(p.category).replace("_", " ").title()
+        out.append(
+            {
+                "reference": receipt_ref(branch.code, p.id),
+                "paid_at": p.paid_at,
+                "amount": p.amount,
+                "method": p.method,
+                "lines": [{"description": line, "amount": p.amount}],
+            }
+        )
+    return out
+
+
+async def pending_freeze(db: AsyncSession, membership: Membership | None):
+    if membership is None:
+        return None
+    return await db.scalar(
+        select(MembershipRequest).where(
+            MembershipRequest.membership_id == membership.id,
+            MembershipRequest.kind == RequestKind.FREEZE,
+            MembershipRequest.status == RequestStatus.PENDING,
+        )
+    )
+
+
+async def pending_freeze_for(db: AsyncSession, member: Member):
+    return await db.scalar(
+        select(MembershipRequest).where(
+            MembershipRequest.member_id == member.id,
+            MembershipRequest.kind == RequestKind.FREEZE,
+            MembershipRequest.status == RequestStatus.PENDING,
+        )
+    )
+
+
+async def request_freeze(
+    db: AsyncSession, member: Member, start: date, weeks: int, reason: str
+) -> MembershipRequest:
+    """A family asks for a freeze: 1 to 4 weeks, once per membership, starting today or later
+    before the membership ends. The operations manager decides."""
+    # The membership running when the freeze starts (else the latest one).
+    m = await db.scalar(
+        select(Membership)
+        .where(
+            Membership.member_id == member.id,
+            Membership.status != MembershipStatus.CANCELLED,
+            Membership.start_date <= start,
+            Membership.end_date >= start,
+        )
+        .order_by(Membership.end_date)
+        .limit(1)
+    ) or await current_membership(db, member)
+    if m is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "There is no membership to freeze."
+        )
+    if not reason.strip():
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Give the reason.")
+    if await pending_freeze_for(db, member) is not None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "There is already a pending request of this kind."
+        )
+    if m.freeze_used:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "This membership has already been frozen once."
+        )
+    if not FREEZE_MIN_WEEKS <= weeks <= FREEZE_MAX_WEEKS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "A freeze is 1 to 4 weeks.")
+    if start < academy_today() or start > m.end_date:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "The freeze must start today or later, before the membership ends.",
+        )
+    req = MembershipRequest(
+        kind=RequestKind.FREEZE,
+        branch_id=m.branch_id,
+        member_id=member.id,
+        membership_id=m.id,
+        freeze_start=start,
+        freeze_weeks=weeks,
+        reason=f"(Requested in the portal) {reason.strip()}"[:255],
+        from_portal=True,
+    )
+    db.add(req)
+    await db.flush()
+    return req
+
+
+async def apply_freeze(db: AsyncSession, req: MembershipRequest) -> None:
+    """An approved freeze: the membership pauses for the weeks asked and ends that much later."""
+    m = await db.get(Membership, req.membership_id, with_for_update=True)
+    end = req.freeze_start + timedelta(weeks=req.freeze_weeks) - timedelta(days=1)
+    db.add(
+        MembershipFreeze(
+            membership_id=m.id, start_date=req.freeze_start, end_date=end, request_id=req.id
+        )
+    )
+    shift = timedelta(weeks=req.freeze_weeks)
+    # Memberships already bought for afterwards move back too, so periods never overlap.
+    later = await db.scalars(
+        select(Membership).where(
+            Membership.member_id == m.member_id,
+            Membership.status != MembershipStatus.CANCELLED,
+            Membership.start_date > m.end_date,
+        )
+    )
+    for nxt in later:
+        nxt.start_date += shift
+        nxt.end_date += shift
+    m.end_date += shift
+    m.freeze_used = True

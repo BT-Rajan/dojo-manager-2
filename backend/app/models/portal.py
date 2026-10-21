@@ -2,14 +2,16 @@
 messages sent to families."""
 
 import enum
-from datetime import datetime
+import secrets
+from datetime import date, datetime
+from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, SmallInteger, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, SmallInteger, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.orm import relationship as orm_relationship
 
 from app.models.base import Base, TimestampMixin, db_enum, utcnow
-from app.models.dojo import Member
+from app.models.dojo import KD, Member, PaymentMethod
 
 
 class Relationship(enum.StrEnum):
@@ -116,3 +118,88 @@ class MessageLog(Base):
     status: Mapped[MessageStatus] = mapped_column(db_enum(MessageStatus))
     error: Mapped[str | None] = mapped_column(String(255))
     at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+# ---------------------------------------------------------------- online renewals
+class RenewalStatus(enum.StrEnum):
+    PENDING = "pending"  # waiting for payment
+    PAID = "paid"
+    FAILED = "failed"
+
+
+def renewal_reference() -> str:
+    return "EA-REN-" + utcnow().strftime("%Y%m%d") + "-" + secrets.token_hex(3).upper()
+
+
+class RenewalPayment(Base):
+    """A membership renewal paid online from the portal through the payment gateway."""
+
+    __tablename__ = "renewal_payments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    reference: Mapped[str] = mapped_column(String(30), unique=True, default=renewal_reference)
+    member_id: Mapped[int] = mapped_column(ForeignKey("members.id"), index=True)
+    plan_id: Mapped[int] = mapped_column(ForeignKey("membership_plans.id"))
+    amount: Mapped[Decimal] = mapped_column(KD)
+    method: Mapped[PaymentMethod] = mapped_column(db_enum(PaymentMethod))
+    status: Mapped[RenewalStatus] = mapped_column(
+        db_enum(RenewalStatus), default=RenewalStatus.PENDING, server_default="pending"
+    )
+    gateway_reference: Mapped[str | None] = mapped_column(String(80))
+    # Who started it: the signed-in guardian, or the adult member themselves.
+    guardian_id: Mapped[int | None] = mapped_column(ForeignKey("guardians.id", ondelete="SET NULL"))
+    by_member_id: Mapped[int | None] = mapped_column(ForeignKey("members.id", ondelete="SET NULL"))
+    membership_id: Mapped[int | None] = mapped_column(ForeignKey("memberships.id"))
+    payment_id: Mapped[int | None] = mapped_column(ForeignKey("payments.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+# ---------------------------------------------------------------- freezes
+class RequestKind(enum.StrEnum):
+    FREEZE = "freeze"
+
+
+class RequestStatus(enum.StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class MembershipRequest(Base):
+    """A change to a membership that the operations manager decides (a freeze)."""
+
+    __tablename__ = "membership_requests"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[RequestKind] = mapped_column(db_enum(RequestKind))
+    branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id"), index=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("members.id"), index=True)
+    membership_id: Mapped[int] = mapped_column(ForeignKey("memberships.id"), index=True)
+    freeze_start: Mapped[date | None] = mapped_column(Date)
+    freeze_weeks: Mapped[int | None] = mapped_column(SmallInteger)
+    reason: Mapped[str] = mapped_column(String(255))
+    status: Mapped[RequestStatus] = mapped_column(
+        db_enum(RequestStatus), default=RequestStatus.PENDING, server_default="pending"
+    )
+    # Requested in the portal (by the family) or logged by staff.
+    from_portal: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    decided_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime)
+    decision_note: Mapped[str | None] = mapped_column(String(255))
+
+
+class MembershipFreeze(Base):
+    """An approved freeze: the membership does not run between these dates."""
+
+    __tablename__ = "membership_freezes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    membership_id: Mapped[int] = mapped_column(
+        ForeignKey("memberships.id", ondelete="CASCADE"), index=True
+    )
+    start_date: Mapped[date] = mapped_column(Date)
+    end_date: Mapped[date] = mapped_column(Date)
+    request_id: Mapped[int | None] = mapped_column(ForeignKey("membership_requests.id"))

@@ -26,6 +26,7 @@ from app.api import (
     payments,
     portal,
     reports,
+    requests,
     users,
 )
 from app.core.config import get_settings
@@ -113,6 +114,7 @@ def create_app(frontend_dist: Path | None = None) -> FastAPI:
         inventory,
         reports,
         portal,
+        requests,
     )
     for module in modules:
         api.include_router(module.router)

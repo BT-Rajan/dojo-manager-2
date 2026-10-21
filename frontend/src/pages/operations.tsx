@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { Page } from "@/components/layout/page";
+import { FreezeRequestsTab } from "@/components/members/freeze-requests";
 import { Empty, EnumSelect, Field, Loading, StatusBadge } from "@/components/common";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -314,6 +315,7 @@ export default function Operations() {
         <TabsList>
           <TabsTrigger value="incidents">Incidents</TabsTrigger>
           {isStaff && <TabsTrigger value="complaints">Complaints</TabsTrigger>}
+          {isStaff && <TabsTrigger value="freezes">Freeze requests</TabsTrigger>}
         </TabsList>
         <TabsContent value="incidents">
           <IncidentsTab />
@@ -321,6 +323,11 @@ export default function Operations() {
         {isStaff && (
           <TabsContent value="complaints">
             <ComplaintsTab />
+          </TabsContent>
+        )}
+        {isStaff && (
+          <TabsContent value="freezes">
+            <FreezeRequestsTab />
           </TabsContent>
         )}
       </Tabs>

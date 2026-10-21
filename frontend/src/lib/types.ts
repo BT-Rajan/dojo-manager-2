@@ -471,3 +471,22 @@ export interface GuardianLink {
   is_primary: boolean;
   other_member_ids: number[];
 }
+
+export interface MembershipRequest {
+  id: number;
+  kind: "freeze";
+  branch_id: number;
+  member_id: number;
+  member_name: string;
+  membership_id: number;
+  plan_name: string;
+  membership_end: string;
+  freeze_start: string | null;
+  freeze_weeks: number | null;
+  reason: string;
+  status: "pending" | "approved" | "rejected";
+  from_portal: boolean;
+  created_at: string;
+  decided_at: string | null;
+  decision_note: string | null;
+}

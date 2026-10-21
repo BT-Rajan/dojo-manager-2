@@ -20,7 +20,10 @@ from app.models import (
 from app.schemas.dojo import MembershipIn
 
 
-async def create_membership(db: AsyncSession, member: Member, body: MembershipIn, user: User):
+async def create_membership(
+    db: AsyncSession, member: Member, body: MembershipIn, user: User | None
+):
+    """``user`` is None for a renewal the family paid online in the portal."""
     plan = await db.get(MembershipPlan, body.plan_id)
     if plan is None or not plan.is_active:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown or inactive plan")
@@ -29,7 +32,7 @@ async def create_membership(db: AsyncSession, member: Member, body: MembershipIn
     if (
         body.price is not None
         and body.price != plan.price
-        and user.role
+        and (user is None or user.role)
         not in (
             Role.OWNER,
             Role.MANAGER,
@@ -62,7 +65,7 @@ async def create_membership(db: AsyncSession, member: Member, body: MembershipIn
         end_date=start + timedelta(days=plan.duration_days - 1),
         price=price,
         notes=body.notes,
-        created_by=user.id,
+        created_by=user.id if user else None,
     )
     db.add(membership)
     await db.flush()
@@ -80,7 +83,7 @@ async def create_membership(db: AsyncSession, member: Member, body: MembershipIn
                 reference=body.payment.reference,
                 paid_at=now,
                 created_at=now,
-                received_by=user.id,
+                received_by=user.id if user else None,
             )
         )
     await db.refresh(membership, ["plan"])

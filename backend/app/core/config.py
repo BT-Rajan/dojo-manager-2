@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     # WhatsApp / SMS provider. "console": development and tests; messages are logged and the
     # portal shows the last code on screen outside production.
     messaging_backend: str = Field(default="console", pattern="^(console)$")
+    # KNET / card provider for online renewals. "test" shows a page with Approve and Decline
+    # buttons instead of the bank's page; online renewal is switched off in production while
+    # it is set.
+    payment_gateway: str = Field(default="test", pattern="^(test)$")
 
     # Initial owner account, created by ``python -m app.seed`` when no users exist.
     bootstrap_owner_username: str = "owner"
