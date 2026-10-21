@@ -9,20 +9,21 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_, select
 
-from app.api.classes import session_dicts, sessions_with_counts
+from app.api.classes import ensure_no_overlap, session_dicts, sessions_with_counts
 from app.core.clock import academy_tz
 from app.core.clock import today as academy_today
-from app.core.deps import ANY_ROLE, DB, CurrentUser, get_scoped_or_404, require_roles
+from app.core.deps import ANY_ROLE, DB, CurrentUser, get_scoped_or_404, require_roles, utcnow
 from app.models import (
     Branch,
     ClassSchedule,
     ClassSession,
     Instructor,
     InstructorLeave,
+    LeaveStatus,
     Role,
     SessionStatus,
 )
-from app.schemas.classes import LeaveOut, ScheduleOut
+from app.schemas.classes import LeaveOut, LeaveRequestIn, ScheduleOut
 from app.schemas.coach import CoachDay, CoachProfile, CoachRole, CoachSession
 
 router = APIRouter(prefix="/coach", tags=["coach"], dependencies=[require_roles(*ANY_ROLE)])
@@ -48,6 +49,16 @@ async def get_coach(user: CurrentUser, db: DB, instructor_id: int | None = None)
 
 
 Coach = Annotated[Instructor, Depends(get_coach)]
+
+
+async def get_own_coach(user: CurrentUser, coach: Coach) -> Instructor:
+    """Actions a coach takes for themselves (requests); staff use the staff screens."""
+    if user.role != Role.INSTRUCTOR:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the coach can do this from the portal")
+    return coach
+
+
+OwnCoach = Annotated[Instructor, Depends(get_own_coach)]
 
 
 def _with_role(rows: list[dict], coach: Instructor) -> list[dict]:
@@ -88,6 +99,7 @@ def week_bounds(day: date) -> tuple[date, date]:
 async def _leaves_on(db: DB, branch_id: int, day: date, instructor_id: int | None = None):
     stmt = select(InstructorLeave).where(
         InstructorLeave.branch_id == branch_id,
+        InstructorLeave.status == LeaveStatus.APPROVED,
         InstructorLeave.start_date <= day,
         InstructorLeave.end_date >= day,
     )
@@ -166,3 +178,68 @@ async def coach_timetable(coach: Coach, db: DB) -> list[ClassSchedule]:
         ClassSchedule.is_active.is_(True),
     )
     return list(await db.scalars(stmt.order_by(ClassSchedule.weekday, ClassSchedule.start_time)))
+
+
+# ---------------------------------------------------------------- leave requests
+MAX_BACKDATE_DAYS = 30
+
+
+@router.get("/leaves", response_model=list[LeaveOut])
+async def coach_leaves(coach: Coach, db: DB) -> list[InstructorLeave]:
+    """All the coach's leave: requests, approved, rejected and withdrawn, newest first."""
+    stmt = select(InstructorLeave).where(InstructorLeave.instructor_id == coach.id)
+    order = (InstructorLeave.start_date.desc(), InstructorLeave.id.desc())
+    return list(await db.scalars(stmt.order_by(*order)))
+
+
+@router.post("/leaves", response_model=LeaveOut, status_code=status.HTTP_201_CREATED)
+async def request_leave(
+    body: LeaveRequestIn, coach: OwnCoach, user: CurrentUser, db: DB
+) -> InstructorLeave:
+    """Ask for leave. Nothing changes until a manager approves it."""
+    if body.start_date < academy_today() - timedelta(days=MAX_BACKDATE_DAYS):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"Leave can be backdated by at most {MAX_BACKDATE_DAYS} days",
+        )
+    if body.cover_instructor_id is not None:
+        cover = await db.get(Instructor, body.cover_instructor_id)
+        if (
+            cover is None
+            or cover.id == coach.id
+            or cover.branch_id != coach.branch_id
+            or not cover.is_active
+        ):
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown cover_instructor_id"
+            )
+    await ensure_no_overlap(db, coach.id, body.start_date, body.end_date)
+    leave = InstructorLeave(
+        **body.model_dump(),
+        instructor_id=coach.id,
+        branch_id=coach.branch_id,
+        status=LeaveStatus.PENDING,
+        requested_by=user.id,
+    )
+    db.add(leave)
+    await db.commit()
+    await db.refresh(leave)
+    return leave
+
+
+@router.post("/leaves/{leave_id}/withdraw", response_model=LeaveOut)
+async def withdraw_leave(leave_id: int, coach: OwnCoach, user: CurrentUser, db: DB):
+    """Withdraw a request that has not been decided yet."""
+    leave = await db.get(InstructorLeave, leave_id)
+    if leave is None or leave.instructor_id != coach.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "InstructorLeave not found")
+    if leave.status != LeaveStatus.PENDING:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Only pending requests can be withdrawn; ask a manager"
+        )
+    leave.status = LeaveStatus.CANCELLED
+    leave.decided_by = user.id
+    leave.decided_at = utcnow()
+    await db.commit()
+    await db.refresh(leave)
+    return leave

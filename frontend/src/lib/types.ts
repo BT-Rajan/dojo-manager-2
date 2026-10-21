@@ -220,7 +220,15 @@ export interface Leave {
   type: string;
   reason: string | null;
   cover_instructor_id: number | null;
+  status: LeaveStatus;
+  requested_by: number | null;
+  decided_by: number | null;
+  decided_at: string | null;
+  decision_note: string | null;
+  created_at: string;
 }
+
+export type LeaveStatus = "pending" | "approved" | "rejected" | "cancelled";
 
 export type LeadStatus =
   | "new"

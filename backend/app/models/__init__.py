@@ -12,6 +12,7 @@ from app.models.classes import (
     Lead,
     LeadSource,
     LeadStatus,
+    LeaveStatus,
     LeaveType,
     SessionStatus,
 )
@@ -162,6 +163,7 @@ __all__ = [
     "Lead",
     "LeadSource",
     "LeadStatus",
+    "LeaveStatus",
     "LeaveType",
     "SessionStatus",
     "AuditLog",

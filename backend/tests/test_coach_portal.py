@@ -178,3 +178,118 @@ async def test_instructor_without_profile(owner, branches):
     r = await c.get("/api/coach/me")
     assert r.status_code == 404 and "No coach profile" in r.json()["detail"]
     await c.aclose()
+
+
+# ---------------------------------------------------------------- phase 2: leave requests
+async def test_leave_request_approval_and_cover(owner, promenade_admin, branches):
+    prm = branches["promenade"]
+    p = await make_program(owner)
+    inst, coach = await _coach_login(owner, prm)
+    cover = await make_instructor(owner, prm, "Coach Cover")
+    day = today() + timedelta(days=2)
+    sess = await _session(owner, prm, p["id"], inst["id"], day)
+    body = {"start_date": day.isoformat(), "end_date": day.isoformat(), "type": "annual"}
+
+    r = await coach.post("/api/coach/leaves", json=body | {"cover_instructor_id": cover["id"]})
+    assert r.status_code == 201, r.text
+    leave = r.json()
+    assert leave["status"] == "pending" and leave["cover_instructor_id"] == cover["id"]
+    # Pending leave changes nothing yet, and a second overlapping request is refused.
+    params = {"date_from": day.isoformat(), "date_to": day.isoformat()}
+    mine = (await coach.get("/api/coach/sessions", params=params)).json()
+    assert mine[0]["coach_role"] == "teaching"
+    assert (await coach.post("/api/coach/leaves", json=body)).status_code == 409
+
+    pending = (await promenade_admin.get("/api/leaves", params={"status": "pending"})).json()
+    assert [lv["id"] for lv in pending] == [leave["id"]]
+
+    url = f"/api/leaves/{leave['id']}/decision"
+    r = await promenade_admin.post(url, json={"approve": True, "note": "Enjoy"})
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "approved" and r.json()["sessions_reassigned"] == 1
+    assert r.json()["decision_note"] == "Enjoy"
+    assert (await promenade_admin.post(url, json={"approve": False})).status_code == 409
+
+    mine = (await coach.get("/api/coach/sessions", params=params)).json()
+    assert [(s["id"], s["coach_role"]) for s in mine] == [(sess["id"], "covered")]
+    assert mine[0]["instructor_id"] == cover["id"]
+    # Approved leave cannot be withdrawn by the coach.
+    r = await coach.post(f"/api/coach/leaves/{leave['id']}/withdraw")
+    assert r.status_code == 409
+    # Removing approved leave hands the class back.
+    assert (await promenade_admin.delete(f"/api/leaves/{leave['id']}")).status_code == 204
+    mine = (await coach.get("/api/coach/sessions", params=params)).json()
+    assert mine[0]["coach_role"] == "teaching"
+    await coach.aclose()
+
+
+async def test_leave_reject_withdraw_and_rules(owner, branches):
+    prm = branches["promenade"]
+    p = await make_program(owner)
+    inst, coach = await _coach_login(owner, prm)
+    other_branch = await make_instructor(owner, branches["bedaya"], "Coach Far")
+    day = today() + timedelta(days=5)
+    body = {"start_date": day.isoformat(), "end_date": day.isoformat(), "type": "sick"}
+
+    # The suggested cover must be another active coach at the same branch.
+    r = await coach.post("/api/coach/leaves", json=body | {"cover_instructor_id": inst["id"]})
+    assert r.status_code == 422
+    r = await coach.post(
+        "/api/coach/leaves", json=body | {"cover_instructor_id": other_branch["id"]}
+    )
+    assert r.status_code == 422
+    old = today() - timedelta(days=40)
+    r = await coach.post(
+        "/api/coach/leaves",
+        json=body | {"start_date": old.isoformat(), "end_date": old.isoformat()},
+    )
+    assert r.status_code == 422
+
+    first = (await coach.post("/api/coach/leaves", json=body)).json()
+    r = await owner.post(
+        f"/api/leaves/{first['id']}/decision", json={"approve": False, "note": "Busy"}
+    )
+    assert r.json()["status"] == "rejected" and r.json()["sessions_reassigned"] == 0
+
+    # A rejected request frees the days for a new one, which the coach can withdraw.
+    second = (await coach.post("/api/coach/leaves", json=body)).json()
+    r = await coach.post(f"/api/coach/leaves/{second['id']}/withdraw")
+    assert r.status_code == 200 and r.json()["status"] == "cancelled"
+    statuses = [lv["status"] for lv in (await coach.get("/api/coach/leaves")).json()]
+    assert sorted(statuses) == ["cancelled", "rejected"]
+
+    # Pending leave does not hand out classes when the week is generated.
+    await coach.post("/api/coach/leaves", json=body)
+    sched = {
+        "branch_id": prm,
+        "program_id": p["id"],
+        "instructor_id": inst["id"],
+        "weekday": day.isoweekday(),
+        "start_time": "17:00",
+        "end_time": "18:00",
+    }
+    await owner.post("/api/schedules", json=sched)
+    gen = {"branch_id": prm, "date_from": day.isoformat(), "date_to": day.isoformat()}
+    assert (await owner.post("/api/sessions/generate", json=gen)).json()["created"] == 1
+    params = {"date_from": day.isoformat(), "date_to": day.isoformat()}
+    mine = (await coach.get("/api/coach/sessions", params=params)).json()
+    assert mine[0]["coach_role"] == "teaching"
+
+    # Staff record leave on the Classes page, not through the coach's own request.
+    r = await owner.post("/api/coach/leaves", params={"instructor_id": inst["id"]}, json=body)
+    assert r.status_code == 403
+    await coach.aclose()
+
+
+async def test_staff_leave_cannot_overlap(owner, branches):
+    inst = await make_instructor(owner, branches["promenade"])
+    day = today() + timedelta(days=1)
+    body = {
+        "instructor_id": inst["id"],
+        "start_date": day.isoformat(),
+        "end_date": (day + timedelta(days=2)).isoformat(),
+        "type": "annual",
+    }
+    r = await owner.post("/api/leaves", json=body)
+    assert r.status_code == 201 and r.json()["status"] == "approved"
+    assert (await owner.post("/api/leaves", json=body)).status_code == 409

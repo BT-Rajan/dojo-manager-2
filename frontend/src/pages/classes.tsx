@@ -260,16 +260,48 @@ function LeaveTab() {
     invalidate: affected,
     success: "Leave removed; covered classes returned to the instructor",
   });
+  const [deciding, setDeciding] = useState<Leave | null>(null);
+  const [decision, setDecision] = useState({ note: "", cover: null as number | null });
+  const decide = useApiMutation(
+    (approve: boolean) =>
+      api<{ sessions_reassigned: number; status: string }>(`/api/leaves/${deciding!.id}/decision`, {
+        method: "POST",
+        body: approve
+          ? { approve, note: decision.note || null, cover_instructor_id: decision.cover }
+          : { approve, note: decision.note || null },
+      }),
+    {
+      invalidate: [...affected, "/api/coach"],
+      onSuccess: (r) => {
+        setDeciding(null);
+        toast({
+          title: r.status === "approved" ? "Leave approved" : "Leave rejected",
+          description: r.sessions_reassigned ? `${r.sessions_reassigned} class(es) handed to the cover` : undefined,
+        });
+      },
+    },
+  );
+  const [show, setShow] = useState<"all" | "pending">("all");
+  const pendingCount = leaves.filter((l) => l.status === "pending").length;
+  const shown = show === "pending" ? leaves.filter((l) => l.status === "pending") : leaves;
 
   return (
     <div className="space-y-4">
-      {isStaff && (
-        <Button onClick={() => setOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Record leave
+      <div className="flex flex-wrap items-center gap-2">
+        {isStaff && (
+          <Button onClick={() => setOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Record leave
+          </Button>
+        )}
+        <Button variant={show === "all" ? "secondary" : "ghost"} size="sm" onClick={() => setShow("all")}>
+          All
         </Button>
-      )}
-      {loading_leaves ? <Loading /> : leaves.length === 0 ? (
-        <Empty>No instructor leave recorded.</Empty>
+        <Button variant={show === "pending" ? "secondary" : "ghost"} size="sm" onClick={() => setShow("pending")}>
+          Awaiting approval ({pendingCount})
+        </Button>
+      </div>
+      {loading_leaves ? <Loading /> : shown.length === 0 ? (
+        <Empty>{show === "pending" ? "No leave requests waiting." : "No instructor leave recorded."}</Empty>
       ) : (
         <Table>
           <TableHeader>
@@ -279,19 +311,38 @@ function LeaveTab() {
               <TableHead>To</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Cover</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {leaves.map((l) => (
+            {shown.map((l) => (
               <TableRow key={l.id}>
                 <TableCell>{instructorMap.get(l.instructor_id)?.full_name}</TableCell>
                 <TableCell>{fmtDate(l.start_date)}</TableCell>
                 <TableCell>{fmtDate(l.end_date)}</TableCell>
-                <TableCell>{label(l.type)}</TableCell>
+                <TableCell>
+                  {label(l.type)}
+                  {l.reason && <p className="text-xs text-muted-foreground">{l.reason}</p>}
+                </TableCell>
                 <TableCell>{l.cover_instructor_id ? instructorMap.get(l.cover_instructor_id)?.full_name : "—"}</TableCell>
                 <TableCell>
-                  {isStaff && (
+                  <StatusBadge status={l.status} />
+                  {l.decision_note && <p className="text-xs text-muted-foreground">{l.decision_note}</p>}
+                </TableCell>
+                <TableCell className="text-right whitespace-nowrap">
+                  {isStaff && l.status === "pending" && (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setDecision({ note: "", cover: l.cover_instructor_id });
+                        setDeciding(l);
+                      }}
+                    >
+                      Review
+                    </Button>
+                  )}
+                  {isStaff && l.status !== "pending" && (
                     <Button variant="ghost" size="sm" onClick={() => remove.mutate(l.id)}>
                       Remove
                     </Button>
@@ -302,6 +353,39 @@ function LeaveTab() {
           </TableBody>
         </Table>
       )}
+      <Dialog open={!!deciding} onOpenChange={(o) => !o && setDeciding(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Leave request from {deciding ? instructorMap.get(deciding.instructor_id)?.full_name : ""}</DialogTitle>
+          </DialogHeader>
+          {deciding && (
+            <p className="text-sm text-muted-foreground">
+              {label(deciding.type)} · {fmtDate(deciding.start_date)} – {fmtDate(deciding.end_date)}
+              {deciding.reason && ` · ${deciding.reason}`}
+            </p>
+          )}
+          <Field label="Cover instructor (classes go to them on approval)">
+            <RecordSelect
+              value={decision.cover}
+              onChange={(c) => setDecision({ ...decision, cover: c })}
+              records={instructors.filter((i) => i.id !== deciding?.instructor_id && i.is_active)}
+              render={(i) => i.full_name}
+              allowNone="No cover"
+            />
+          </Field>
+          <Field label="Note to the coach (optional)">
+            <Input value={decision.note} maxLength={255} onChange={(e) => setDecision({ ...decision, note: e.target.value })} />
+          </Field>
+          <div className="flex gap-2">
+            <Button disabled={decide.isPending} onClick={() => decide.mutate(true)}>
+              Approve
+            </Button>
+            <Button variant="destructive" disabled={decide.isPending} onClick={() => decide.mutate(false)}>
+              Reject
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>

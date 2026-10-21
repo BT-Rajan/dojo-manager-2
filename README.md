@@ -27,8 +27,10 @@ gradings and seminars, front-desk operations, and inventory.
 - **Coach portal**: each coach signs in with their own login (created under Admin → Coach
   portal) and lands on their portal: today's classes with attendance, the branch's whole day
   (every class, who teaches it, who is on leave), and their week (Saturday to Friday) with the
-  weekly timetable. Classes they cover and classes covered for them are marked. Staff can open
-  any coach's portal at their branches.
+  weekly timetable, a month calendar with classes, covers and leave, and their leave: coaches
+  request leave (with a suggested cover) and a manager approves or rejects it under Classes →
+  Instructor leave; only approved leave hands classes to the cover. Classes they cover and
+  classes covered for them are marked. Staff can open any coach's portal at their branches.
 - **Member and parent portal** (`/portal`, English and Arabic): families sign in with their
   mobile number and a 4-digit WhatsApp code (no passwords) and see each child's belt and
   stripes, next class and membership (with "renew soon" warnings). Parents are linked to
