@@ -65,3 +65,22 @@ export interface FamilyMember {
   status: "active" | "expiring" | "expired" | "frozen" | "none";
   expiring: boolean;
 }
+
+export interface ClassRow {
+  session_id: number;
+  session_date: string;
+  start_time: string;
+  end_time: string;
+  title: string;
+  regular: boolean;
+  booking: { status: "booked" | "waitlisted" } | null;
+  can_book: boolean;
+}
+
+export interface MemberDetail {
+  member: { id: number; first_name: string; last_name: string; branch_name: string; branch_code: string };
+  status: FamilyMember["status"];
+  membership: FamilyMember["membership"];
+  classes: ClassRow[];
+  attendance: { session_date: string; start_time: string; title: string; status: string }[];
+}

@@ -34,7 +34,10 @@ from app.models import (
     Program,
 )
 from app.schemas.portal import (
+    BookIn,
+    BookOut,
     FamilyMemberOut,
+    MemberDetailOut,
     PortalMe,
     SendCodeIn,
     SendCodeOut,
@@ -316,3 +319,77 @@ async def family(session: Family, db: DB) -> list[dict]:
             }
         )
     return rows
+
+
+# ---------------------------------------------------------------- one member's page
+def _membership_brief(ms) -> dict | None:
+    if ms is None:
+        return None
+    return {
+        "id": ms.id,
+        "plan_name": ms.plan.name,
+        "start_date": ms.start_date,
+        "end_date": ms.end_date,
+        "status": ms.status,
+    }
+
+
+@router.get("/members/{member_id}", response_model=MemberDetailOut)
+async def member_page(member_id: int, session: Family, db: DB) -> dict:
+    """Membership, this week's classes (regular, booked, or bookable) and recent attendance."""
+    member = await ps.member_for(db, session, member_id)
+    branch = await db.get(Branch, member.branch_id)
+    info = await ps.member_status(db, member, academy_today())
+    classes = []
+    for r in await ps.upcoming(db, member):
+        s = r["session"]
+        classes.append(
+            {
+                "session_id": s.id,
+                "session_date": s.session_date,
+                "start_time": s.start_time,
+                "end_time": s.end_time,
+                "title": await _class_title(db, s),
+                "regular": r["regular"],
+                "booking": {"status": r["booking"].status} if r["booking"] else None,
+                "can_book": r["can_book"],
+            }
+        )
+    attended = [
+        {
+            "session_date": s.session_date,
+            "start_time": s.start_time,
+            "title": await _class_title(db, s),
+            "status": a.status,
+        }
+        for s, a in await ps.recent_attendance(db, member)
+    ]
+    return {
+        "member": {
+            "id": member.id,
+            "first_name": member.first_name,
+            "last_name": member.last_name,
+            "branch_name": branch.name,
+            "branch_code": branch.code,
+        },
+        "status": info.code,
+        "membership": _membership_brief(info.membership),
+        "classes": classes,
+        "attendance": attended,
+    }
+
+
+@router.post("/members/{member_id}/book", response_model=BookOut)
+async def book_class(member_id: int, body: BookIn, session: Family, db: DB) -> dict:
+    member = await ps.member_for(db, session, member_id)
+    row = await ps.book(db, session, member, body.session_id, body.lang)
+    await db.commit()
+    return {"status": row.status}
+
+
+@router.post("/members/{member_id}/cancel", response_model=BookOut)
+async def cancel_class(member_id: int, body: BookIn, session: Family, db: DB) -> dict:
+    member = await ps.member_for(db, session, member_id)
+    row = await ps.cancel(db, session, member, body.session_id, body.lang)
+    await db.commit()
+    return {"status": row.status, "late_cancellation": row.late_cancellation}

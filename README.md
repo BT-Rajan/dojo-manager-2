@@ -37,6 +37,14 @@ gradings and seminars, front-desk operations, and inventory.
   hashed, expire after 5 minutes and allow 5 attempts; 3 codes per number per 15 minutes and
   10 per address per hour; the answer is the same for unknown numbers. Until WhatsApp is
   connected, messages are logged and the code is shown on screen outside production.
+  Each child's page shows the membership and this week's classes: regular weekly classes,
+  bookings (with Cancel) and the classes their membership lets them book, up to 7 days ahead
+  at their branch. A full class puts them on the waiting list; when a booked place is freed
+  the first in line gets it and is told by WhatsApp. Cancelling less than 2 hours before is
+  recorded as late. Recent attendance is listed too.
+- **Regular classes**: members can hold a regular weekly place in a timetable class (member
+  page → Regular classes). Regulars count towards class capacity and appear on every class
+  roster, with bookings, the waiting list and portal bookings marked.
 - **Leads**: enquiry → contacted → trial booked → attended → member (or lost, with reason).
 - **Gradings & seminars**: Kajukenbo belt system (belt = rank + kickboxing level, stripe =
   grappling level, seminar points required), grading events that promote passing students,

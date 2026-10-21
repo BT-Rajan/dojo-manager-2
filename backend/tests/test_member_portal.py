@@ -2,7 +2,7 @@ import re
 from datetime import timedelta
 
 import pytest
-from sqlalchemy import update
+from sqlalchemy import select, update
 
 from app.api.portal import ip_limiter, number_limiter
 from app.core.clock import today
@@ -240,4 +240,229 @@ async def test_changing_phone_updates_sign_in(owner, branches):
     assert r.status_code == 200
     c = await _sign_in("90002222")
     assert (await c.get("/api/portal/me")).json()["kind"] == "member"
+    await c.aclose()
+
+
+# ---------------------------------------------------------------- phase 2: classes and bookings
+async def _messages(kind=None):
+    from app.models import MessageLog
+
+    async with get_sessionmaker()() as db:
+        stmt = select(MessageLog).order_by(MessageLog.id)
+        if kind:
+            stmt = stmt.where(MessageLog.kind == kind)
+        return list(await db.scalars(stmt))
+
+
+async def _session(owner, branch_id, program_id, day, start="17:00", end="18:00", capacity=20):
+    r = await owner.post(
+        "/api/sessions",
+        json={
+            "branch_id": branch_id,
+            "program_id": program_id,
+            "session_date": day.isoformat(),
+            "start_time": start,
+            "end_time": end,
+            "capacity": capacity,
+        },
+    )
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
+async def _member_with_plan(owner, branch_id, program_id=None, **kw):
+    child = await _child(owner, branch_id, **kw)
+    body = {"name": "Monthly", "duration_days": 30, "price": "65.000"}
+    if program_id:
+        body["program_id"] = program_id
+    plan = (await owner.post("/api/plans", json=body)).json()
+    r = await owner.post(
+        "/api/memberships",
+        json={"member_id": child["id"], "plan_id": plan["id"], "start_date": today().isoformat()},
+    )
+    assert r.status_code == 201, r.text
+    return child
+
+
+async def test_book_and_cancel_from_the_portal(owner, branches):
+    prm = branches["promenade"]
+    p = await make_program(owner)
+    child = await _member_with_plan(owner, prm)
+    soon = await _session(owner, prm, p["id"], today() + timedelta(days=2))
+    far = await _session(owner, prm, p["id"], today() + timedelta(days=9))
+    await _session(owner, branches["bedaya"], p["id"], today() + timedelta(days=2))
+    c = await _sign_in()
+
+    page = (await c.get(f"/api/portal/members/{child['id']}")).json()
+    assert page["status"] == "active" and page["membership"]["plan_name"] == "Monthly"
+    assert [(r["session_id"], r["can_book"]) for r in page["classes"]] == [(soon["id"], True)]
+
+    url = f"/api/portal/members/{child['id']}"
+    r = await c.post(f"{url}/book", json={"session_id": soon["id"], "lang": "ar"})
+    assert r.status_code == 200 and r.json()["status"] == "booked"
+    sent = await _messages("booking_confirmed")
+    assert sent[-1].to == "+96555551111" and "تم حجز" in sent[-1].text
+    assert (await c.post(f"{url}/book", json={"session_id": soon["id"]})).status_code == 409
+    # More than 7 days ahead, or at another branch, cannot be booked.
+    assert (await c.post(f"{url}/book", json={"session_id": far["id"]})).status_code == 422
+
+    page = (await c.get(url)).json()
+    assert page["classes"][0]["booking"] == {"status": "booked"}
+    family = (await c.get("/api/portal/family")).json()
+    assert family[0]["next_class"]["session_id"] == soon["id"]
+
+    r = await c.post(f"{url}/cancel", json={"session_id": soon["id"]})
+    assert r.json() == {"status": "cancelled", "late_cancellation": False}
+    assert (await c.post(f"{url}/cancel", json={"session_id": soon["id"]})).status_code == 409
+    # It can be booked again after cancelling.
+    r = await c.post(f"{url}/book", json={"session_id": soon["id"]})
+    assert r.json()["status"] == "booked"
+    await c.aclose()
+
+
+async def test_late_cancellation_is_recorded(owner, branches):
+    from datetime import datetime
+
+    from app.core.clock import academy_tz
+
+    prm = branches["promenade"]
+    p = await make_program(owner)
+    child = await _member_with_plan(owner, prm)
+    now = datetime.now(academy_tz())
+    if now.hour >= 22:
+        pytest.skip("needs a class later today")
+    start = f"{now.hour + 1:02d}:00"
+    end = f"{now.hour + 1:02d}:50"
+    sess = await _session(owner, prm, p["id"], today(), start, end)
+    c = await _sign_in()
+    url = f"/api/portal/members/{child['id']}"
+    await c.post(f"{url}/book", json={"session_id": sess["id"]})
+    r = await c.post(f"{url}/cancel", json={"session_id": sess["id"]})
+    assert r.json()["late_cancellation"] is True
+    await c.aclose()
+
+
+async def test_full_class_waiting_list_and_promotion(owner, branches):
+    prm = branches["promenade"]
+    p = await make_program(owner)
+    child = await _member_with_plan(owner, prm)
+    other = await make_member(owner, prm, first="Other", phone="66001122")
+    sess = await _session(owner, prm, p["id"], today() + timedelta(days=1), capacity=1)
+    r = await owner.post(
+        f"/api/sessions/{sess['id']}/attendance",
+        json={"entries": [{"member_id": other["id"], "status": "booked"}]},
+    )
+    assert r.status_code == 200
+    c = await _sign_in()
+    url = f"/api/portal/members/{child['id']}"
+    r = await c.post(f"{url}/book", json={"session_id": sess["id"]})
+    assert r.json()["status"] == "waitlisted"
+    assert "waiting list" in (await _messages("waitlisted"))[-1].text
+    roster = (await owner.get(f"/api/sessions/{sess['id']}/attendance")).json()
+    assert [(row["member_id"], row["status"]) for row in roster] == [
+        (other["id"], "booked"),
+        (child["id"], "waitlisted"),
+    ]
+    assert roster[1]["source"] == "portal"
+
+    # The desk removes the other booking: the place goes to the waiting list.
+    assert (
+        await owner.delete(f"/api/sessions/{sess['id']}/attendance/{other['id']}")
+    ).status_code == 204
+    page = (await c.get(url)).json()
+    assert page["classes"][0]["booking"] == {"status": "booked"}
+    msg = (await _messages("waitlist_place"))[-1]
+    assert msg.to == "+96555551111" and "place opened" in msg.text
+    await c.aclose()
+
+
+async def test_regular_class_and_membership_rules(owner, promenade_admin, branches):
+    prm = branches["promenade"]
+    kids = await make_program(owner, name="Kids Kajukenbo")
+    adults = await make_program(owner, name="Adult BJJ")
+    # The plan covers only the kids programme.
+    child = await _member_with_plan(owner, prm, program_id=kids["id"])
+    day = today() + timedelta(days=3)
+    sched = (
+        await owner.post(
+            "/api/schedules",
+            json={
+                "branch_id": prm,
+                "program_id": kids["id"],
+                "weekday": day.isoweekday(),
+                "start_time": "16:00",
+                "end_time": "17:00",
+                "capacity": 1,
+            },
+        )
+    ).json()
+    url = f"/api/members/{child['id']}/enrollments"
+    r = await promenade_admin.post(url, json={"schedule_id": sched["id"]})
+    assert r.status_code == 201, r.text
+    assert (await promenade_admin.post(url, json={"schedule_id": sched["id"]})).status_code == 409
+    gen = {"branch_id": prm, "date_from": day.isoformat(), "date_to": day.isoformat()}
+    await owner.post("/api/sessions/generate", json=gen)
+    params = {"date_from": day.isoformat(), "date_to": day.isoformat(), "branch_id": prm}
+    regular_sess = (await owner.get("/api/sessions", params=params)).json()[0]
+    # The regular member takes the only place.
+    assert regular_sess["booked"] == 1
+    adult_sess = await _session(owner, prm, adults["id"], day, "18:00", "19:00")
+
+    c = await _sign_in()
+    purl = f"/api/portal/members/{child['id']}"
+    page = (await c.get(purl)).json()
+    assert [(r["session_id"], r["regular"], r["can_book"]) for r in page["classes"]] == [
+        (regular_sess["id"], True, False)
+    ]
+    assert (
+        await c.post(f"{purl}/book", json={"session_id": regular_sess["id"]})
+    ).status_code == 409
+    r = await c.post(f"{purl}/book", json={"session_id": adult_sess["id"]})
+    assert r.status_code == 422 and "doesn't cover" in r.json()["detail"]
+    family = (await c.get("/api/portal/family")).json()
+    assert family[0]["next_class"]["session_id"] == regular_sess["id"]
+
+    # The class roster lists the regular before anyone has checked in.
+    roster = (await owner.get(f"/api/sessions/{regular_sess['id']}/attendance")).json()
+    assert roster[0]["id"] is None and roster[0]["is_regular"] is True
+    # A full class sends a desk booking over capacity back.
+    other = await make_member(owner, prm, first="Other", phone="66001122")
+    r = await owner.post(
+        f"/api/sessions/{regular_sess['id']}/attendance",
+        json={"entries": [{"member_id": other["id"], "status": "booked"}]},
+    )
+    assert r.status_code == 409
+
+    enrollments = (await promenade_admin.get(url)).json()
+    r = await promenade_admin.post(f"/api/enrollments/{enrollments[0]['id']}/end", json={})
+    assert r.status_code == 200 and r.json()["is_active"] is True  # ends today, still today
+    await c.aclose()
+
+
+async def test_portal_cannot_reach_another_family(owner, branches):
+    prm = branches["promenade"]
+    p = await make_program(owner)
+    mine = await _member_with_plan(owner, prm)
+    theirs = await _member_with_plan(owner, prm, first="Stranger", parent_phone="99887766")
+    sess = await _session(owner, prm, p["id"], today() + timedelta(days=1))
+    c = await _sign_in()
+    assert (await c.get(f"/api/portal/members/{theirs['id']}")).status_code == 404
+    r = await c.post(f"/api/portal/members/{theirs['id']}/book", json={"session_id": sess["id"]})
+    assert r.status_code == 404
+    assert (await c.get(f"/api/portal/members/{mine['id']}")).status_code == 200
+    await c.aclose()
+
+
+async def test_recent_attendance_shows_visits(owner, branches):
+    prm = branches["promenade"]
+    p = await make_program(owner)
+    child = await _member_with_plan(owner, prm)
+    past = await _session(owner, prm, p["id"], today() - timedelta(days=2))
+    await owner.post(
+        f"/api/sessions/{past['id']}/attendance",
+        json={"entries": [{"member_id": child["id"], "status": "present"}]},
+    )
+    c = await _sign_in()
+    page = (await c.get(f"/api/portal/members/{child['id']}")).json()
+    assert [a["session_date"] for a in page["attendance"]] == [past["session_date"]]
     await c.aclose()

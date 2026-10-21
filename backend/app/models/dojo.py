@@ -137,6 +137,8 @@ class Member(TimestampMixin, Base):
     # ``phone`` as +965XXXXXXXX when it is a Kuwait mobile: adult members sign in to the
     # portal with it. Kept in step with ``phone`` by the API.
     portal_mobile: Mapped[str | None] = mapped_column(String(16), index=True)
+    # Language for messages to an adult member (the one they last used in the portal).
+    language: Mapped[str] = mapped_column(String(2), default="ar", server_default="ar")
     email: Mapped[str | None] = mapped_column(String(255))
     guardian_name: Mapped[str | None] = mapped_column(String(150))
     guardian_phone: Mapped[str | None] = mapped_column(String(30))

@@ -74,3 +74,52 @@ class FamilyMemberOut(OutModel):
     # active, expiring, expired, frozen or none
     status: str
     expiring: bool
+
+
+# ---------------------------------------------------------------- one member's page
+class MemberHead(OutModel):
+    id: int
+    first_name: str
+    last_name: str
+    branch_name: str
+    branch_code: str
+
+
+class BookingBrief(OutModel):
+    status: str  # booked or waitlisted
+
+
+class ClassRow(OutModel):
+    session_id: int
+    session_date: date
+    start_time: time
+    end_time: time
+    title: str
+    regular: bool
+    booking: BookingBrief | None
+    can_book: bool
+
+
+class AttendedRow(OutModel):
+    session_date: date
+    start_time: time
+    title: str
+    status: str
+
+
+class MemberDetailOut(OutModel):
+    member: MemberHead
+    status: str
+    membership: MembershipBrief | None
+    classes: list[ClassRow]
+    attendance: list[AttendedRow]
+
+
+class BookIn(InModel):
+    session_id: int
+    lang: Lang = "en"
+
+
+class BookOut(OutModel):
+    status: str
+    late_cancellation: bool = False

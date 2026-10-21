@@ -172,16 +172,34 @@ export interface ClassSession {
   attended: number;
 }
 
-export type AttendanceStatus = "booked" | "present" | "late" | "absent" | "excused";
+export type AttendanceStatus = "booked" | "present" | "late" | "absent" | "excused" | "waitlisted" | "cancelled";
 
 export interface AttendanceRow {
-  id: number;
+  /** null: a regular member with no booking or check-in for this class yet. */
+  id: number | null;
   session_id: number;
   member_id: number;
-  status: AttendanceStatus;
+  status: AttendanceStatus | null;
   checked_in_at: string | null;
   member: MemberBrief;
   has_active_membership: boolean;
+  is_regular: boolean;
+  source: "desk" | "portal";
+  late_cancellation: boolean;
+}
+
+export interface Enrollment {
+  id: number;
+  member_id: number;
+  schedule_id: number;
+  start_date: string;
+  end_date: string | null;
+  weekday: number;
+  start_time: string;
+  end_time: string;
+  program_id: number;
+  title: string | null;
+  is_active: boolean;
 }
 
 export interface Leave {
