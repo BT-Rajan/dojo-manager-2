@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { KeyRound, Plus } from "lucide-react";
+import { Clock, KeyRound, Plus, UserCheck, Users } from "lucide-react";
 import { Page } from "@/components/layout/page";
-import { BeltSwatch, Empty, EnumSelect, Field, RecordSelect, StatusBadge } from "@/components/common";
+import { BeltSwatch, Empty, EnumSelect, Field, Loading, RecordSelect, StatCard, StatusBadge } from "@/components/common";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -16,7 +16,7 @@ import { useBranch, useBranches } from "@/hooks/useBranch";
 import { useBelts, useInstructors, usePrograms } from "@/hooks/useLookups";
 import { ROLE_LABELS, fmtDateTime, kd, label } from "@/lib/format";
 import { api } from "@/lib/queryClient";
-import type { Branch, Plan, Role, User } from "@/lib/types";
+import type { Branch, Plan, PortalAccess, Role, User } from "@/lib/types";
 
 const ROLES: Role[] = ["owner", "manager", "branch_admin", "instructor"];
 
@@ -338,6 +338,134 @@ function InstructorsTab() {
   );
 }
 
+function CoachPortalTab() {
+  const { branchId, branch } = useBranch();
+  const { data: rows = [], isLoading } = useQuery<PortalAccess[]>({
+    queryKey: ["/api/instructors/portal-access", { branch_id: branchId }],
+    enabled: branchId !== null,
+  });
+  const [creating, setCreating] = useState<PortalAccess | null>(null);
+  const [resetting, setResetting] = useState<PortalAccess | null>(null);
+  const [f, setF] = useState({ username: "", password: "", email: "" });
+  const inv = { invalidate: ["/api/instructors", "/api/users"] };
+  const url = (r: PortalAccess) => `/api/instructors/${r.instructor_id}/portal-account`;
+  const create = useApiMutation(
+    () => api(url(creating!), { method: "POST", body: { username: f.username, password: f.password, email: f.email || null } }),
+    { ...inv, success: "Portal login created", onSuccess: () => setCreating(null) },
+  );
+  const reset = useApiMutation(
+    () => api(`${url(resetting!)}/reset-password`, { method: "POST", body: { password: f.password } }),
+    { success: "Password reset; the coach was signed out", onSuccess: () => setResetting(null) },
+  );
+  const toggle = useApiMutation(
+    (r: PortalAccess) => api(url(r), { method: "PATCH", body: { is_active: !r.user_active } }),
+    inv,
+  );
+  const open = (r: PortalAccess, which: "create" | "reset") => {
+    setF({ username: "", password: "", email: "" });
+    (which === "create" ? setCreating : setResetting)(r);
+  };
+  if (!branchId) return <Empty>Choose a branch first.</Empty>;
+  const withLogin = rows.filter((r) => r.user_id !== null);
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Coaches at {branch?.name} sign in with these logins to open their own portal: today's classes, the branch's
+        day and their weekly schedule.
+      </p>
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <StatCard title="Coaches" value={rows.length} icon={Users} />
+        <StatCard title="With portal login" value={withLogin.length} icon={KeyRound} tone="text-info" />
+        <StatCard title="Login enabled" value={withLogin.filter((r) => r.user_active).length} icon={UserCheck} tone="text-success" />
+        <StatCard title="Never signed in" value={withLogin.filter((r) => !r.last_login_at).length} icon={Clock} tone="text-warning" />
+      </div>
+      {isLoading ? (
+        <Loading />
+      ) : rows.length === 0 ? (
+        <Empty>No instructors at this branch.</Empty>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Coach</TableHead>
+              <TableHead>Portal username</TableHead>
+              <TableHead>Portal status</TableHead>
+              <TableHead>Last sign-in</TableHead>
+              <TableHead>Login enabled</TableHead>
+              <TableHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((r) => (
+              <TableRow key={r.instructor_id}>
+                <TableCell>
+                  {r.full_name}
+                  {!r.is_active && <span className="ml-2 text-xs text-muted-foreground">(inactive coach)</span>}
+                </TableCell>
+                <TableCell className="font-mono text-xs">{r.username ?? "—"}</TableCell>
+                <TableCell>
+                  <StatusBadge status={r.user_id === null ? "no_login" : r.user_active ? "active" : "inactive"} />
+                </TableCell>
+                <TableCell>{r.user_id ? fmtDateTime(r.last_login_at) : "—"}</TableCell>
+                <TableCell>
+                  {r.user_id !== null && (
+                    <Switch checked={!!r.user_active} onCheckedChange={() => toggle.mutate(r)} aria-label={`Portal login for ${r.full_name}`} />
+                  )}
+                </TableCell>
+                <TableCell className="text-right">
+                  {r.user_id === null ? (
+                    <Button size="sm" onClick={() => open(r, "create")}>
+                      <Plus className="h-4 w-4 mr-1" /> Create login
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="ghost" onClick={() => open(r, "reset")}>
+                      <KeyRound className="h-4 w-4 mr-1" /> Reset password
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+      <Dialog open={!!creating} onOpenChange={(o) => !o && setCreating(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Portal login for {creating?.full_name}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">The coach signs in with this username to open their portal.</p>
+          <Field label="Username">
+            <Input autoComplete="off" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} />
+          </Field>
+          <Field label="Password (10+ characters)">
+            <Input type="password" autoComplete="new-password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
+          </Field>
+          <Field label="Email (optional)">
+            <Input type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
+          </Field>
+          <Button disabled={f.username.length < 3 || f.password.length < 10 || create.isPending} onClick={() => create.mutate(undefined)}>
+            Create login
+          </Button>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!resetting} onOpenChange={(o) => !o && setResetting(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset portal password for {resetting?.full_name}</DialogTitle>
+          </DialogHeader>
+          <Field label="New password (10+ characters)">
+            <Input type="password" autoComplete="new-password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
+          </Field>
+          <Button disabled={f.password.length < 10 || reset.isPending} onClick={() => reset.mutate(undefined)}>
+            Reset password
+          </Button>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 function CatalogTab() {
   const { programs } = usePrograms();
   const { belts } = useBelts();
@@ -516,6 +644,7 @@ export default function Admin() {
           {isOwner && <TabsTrigger value="users">Users</TabsTrigger>}
           {isOwner && <TabsTrigger value="branches">Branches</TabsTrigger>}
           <TabsTrigger value="instructors">Instructors</TabsTrigger>
+          <TabsTrigger value="coach-portal">Coach portal</TabsTrigger>
           <TabsTrigger value="catalog">Plans, programmes & belts</TabsTrigger>
         </TabsList>
         {isOwner && (
@@ -530,6 +659,9 @@ export default function Admin() {
         )}
         <TabsContent value="instructors">
           <InstructorsTab />
+        </TabsContent>
+        <TabsContent value="coach-portal">
+          <CoachPortalTab />
         </TabsContent>
         <TabsContent value="catalog">
           <CatalogTab />

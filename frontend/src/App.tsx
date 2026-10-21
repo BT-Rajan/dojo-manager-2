@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { queryClient } from "@/lib/queryClient";
 import Admin from "@/pages/admin";
 import Classes from "@/pages/classes";
+import Coach from "@/pages/coach";
 import Dashboard from "@/pages/dashboard";
 import Gradings from "@/pages/gradings";
 import Home from "@/pages/home";
@@ -38,6 +39,7 @@ function Router() {
       <Route path="/members" component={Members} />
       <Route path="/members/:id" component={MemberDetail} />
       <Route path="/classes" component={Classes} />
+      <Route path="/coach" component={Coach} />
       <Route path="/leads" component={Leads} />
       <Route path="/gradings" component={Gradings} />
       <Route path="/inventory" component={Inventory} />

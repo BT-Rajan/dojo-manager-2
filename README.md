@@ -24,6 +24,11 @@ gradings and seminars, front-desk operations, and inventory.
 - **Classes**: weekly timetable, idempotent generation of dated sessions; recording leave
   hands already-generated classes to the cover instructor (and back if the leave is removed), cancel/reschedule with a reason, bulk check-in with capacity lock and a
   "membership covers this date" flag, instructor leave.
+- **Coach portal**: each coach signs in with their own login (created under Admin → Coach
+  portal) and lands on their portal: today's classes with attendance, the branch's whole day
+  (every class, who teaches it, who is on leave), and their week (Saturday to Friday) with the
+  weekly timetable. Classes they cover and classes covered for them are marked. Staff can open
+  any coach's portal at their branches.
 - **Leads**: enquiry → contacted → trial booked → attended → member (or lost, with reason).
 - **Gradings & seminars**: Kajukenbo belt system (belt = rank + kickboxing level, stripe =
   grappling level, seminar points required), grading events that promote passing students,

@@ -63,6 +63,7 @@ const TONES: Record<string, string> = {
   open: "bg-warning/15 text-warning",
   excused: "bg-muted text-foreground/80",
   inactive: "bg-muted text-foreground/80",
+  no_login: "bg-muted text-foreground/80",
   cancelled: "bg-destructive/15 text-destructive",
   rejected: "bg-destructive/15 text-destructive",
   absent: "bg-destructive/15 text-destructive",

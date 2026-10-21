@@ -12,17 +12,19 @@ export default function Home() {
   const { branches, branchId } = useBranch();
   const [, setLocation] = useLocation();
   const active = branches.filter((b) => b.is_active);
+  // Coaches land in their own portal; everyone else on the branch dashboard.
+  const landing = user?.role === "instructor" ? "/coach" : "/dashboard";
 
   useEffect(() => {
     if (active.length === 1 && branchId !== active[0].id) {
       setSelectedBranch(active[0].id);
-      setLocation("/dashboard");
+      setLocation(landing);
     }
-  }, [active, branchId, setLocation]);
+  }, [active, branchId, landing, setLocation]);
 
   const choose = (id: number) => {
     setSelectedBranch(id);
-    setLocation("/dashboard");
+    setLocation(landing);
   };
 
   return (
