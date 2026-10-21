@@ -398,3 +398,46 @@ export interface Dashboard {
   revenue_today?: string;
   revenue_month?: string;
 }
+
+// ---------------------------------------------------------------- coach portal
+/** The coach's part in a class: their own, someone else's they cover, or theirs being covered. */
+export type CoachRole = "teaching" | "covering" | "covered";
+
+export interface CoachSession extends ClassSession {
+  coach_role: CoachRole | null;
+}
+
+export interface CoachProfile {
+  id: number;
+  branch_id: number;
+  branch: Branch;
+  user_id: number | null;
+  full_name: string;
+  phone: string | null;
+  email: string | null;
+  specialties: string | null;
+  belt_rank_id: number | null;
+  is_active: boolean;
+  today: string;
+  classes_today: number;
+  classes_this_week: number;
+  next_session: CoachSession | null;
+  leave_today: Leave | null;
+}
+
+export interface CoachDay {
+  date: string;
+  sessions: CoachSession[];
+  on_leave: Leave[];
+}
+
+export interface PortalAccess {
+  instructor_id: number;
+  full_name: string;
+  branch_id: number;
+  is_active: boolean;
+  user_id: number | null;
+  username: string | null;
+  user_active: boolean | null;
+  last_login_at: string | null;
+}

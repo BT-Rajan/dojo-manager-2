@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import case, delete, func, select, update
+from sqlalchemy import Select, case, delete, func, select, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.orm import selectinload
 
@@ -64,6 +64,37 @@ async def _check_instructor(db: DB, user, instructor_id: int | None) -> None:
     inst = await db.get(Instructor, instructor_id)
     if inst is None or not can_access_branch(user, inst.branch_id):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown instructor_id")
+
+
+def sessions_with_counts() -> Select:
+    """Sessions with their booked and present counts, in date and time order. Callers add
+    their own filters (and branch scoping)."""
+    counts = (
+        select(
+            Attendance.session_id,
+            func.sum(case((Attendance.status.in_(ATTENDING), 1), else_=0)).label("booked"),
+            func.sum(case((Attendance.status.in_(PRESENT), 1), else_=0)).label("attended"),
+        )
+        .group_by(Attendance.session_id)
+        .subquery()
+    )
+    return (
+        select(
+            ClassSession,
+            func.coalesce(counts.c.booked, 0),
+            func.coalesce(counts.c.attended, 0),
+        )
+        .outerjoin(counts, counts.c.session_id == ClassSession.id)
+        .order_by(ClassSession.session_date, ClassSession.start_time)
+    )
+
+
+async def session_dicts(db: DB, stmt: Select) -> list[dict]:
+    out = []
+    for sess, booked, attended in (await db.execute(stmt)).all():
+        row = SessionOut.model_validate(sess).model_dump()
+        out.append(row | {"booked": int(booked), "attended": int(attended)})
+    return out
 
 
 # ---------------------------------------------------------------- weekly schedule
@@ -189,35 +220,13 @@ async def list_sessions(
 ) -> list[dict]:
     if (date_to - date_from).days > 92:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Range too large (max 93 days)")
-    counts = (
-        select(
-            Attendance.session_id,
-            func.sum(case((Attendance.status.in_(ATTENDING), 1), else_=0)).label("booked"),
-            func.sum(case((Attendance.status.in_(PRESENT), 1), else_=0)).label("attended"),
-        )
-        .group_by(Attendance.session_id)
-        .subquery()
-    )
-    stmt = (
-        select(
-            ClassSession,
-            func.coalesce(counts.c.booked, 0),
-            func.coalesce(counts.c.attended, 0),
-        )
-        .outerjoin(counts, counts.c.session_id == ClassSession.id)
-        .where(ClassSession.session_date.between(date_from, date_to))
-        .order_by(ClassSession.session_date, ClassSession.start_time)
-    )
+    stmt = sessions_with_counts().where(ClassSession.session_date.between(date_from, date_to))
     stmt = scope_to_branches(stmt, ClassSession.branch_id, user, branch_id)
     if instructor_id is not None:
         stmt = stmt.where(ClassSession.instructor_id == instructor_id)
     if program_id is not None:
         stmt = stmt.where(ClassSession.program_id == program_id)
-    out = []
-    for sess, booked, attended in (await db.execute(stmt)).all():
-        row = SessionOut.model_validate(sess).model_dump()
-        out.append(row | {"booked": int(booked), "attended": int(attended)})
-    return out
+    return await session_dicts(db, stmt)
 
 
 @router.post("/sessions", response_model=SessionOut, status_code=201, dependencies=staff)

@@ -3,6 +3,7 @@ import {
   Award,
   BarChart3,
   CalendarDays,
+  CircleUserRound,
   ClipboardList,
   Home,
   LogOut,
@@ -37,10 +38,13 @@ export function Header() {
   const { theme, toggle } = useTheme();
   const [location, setLocation] = useLocation();
 
+  const isCoach = user?.role === "instructor";
   const nav: NavItem[] = [
+    { path: "/coach", label: "My portal", icon: CircleUserRound, show: isCoach },
     { path: "/dashboard", label: "Dashboard", icon: Home, show: true },
     { path: "/members", label: "Members", icon: Users, show: true },
     { path: "/classes", label: "Classes", icon: CalendarDays, show: true },
+    { path: "/coach", label: "Coach portal", icon: CircleUserRound, show: isStaff },
     { path: "/leads", label: "Leads", icon: UserPlus, show: isStaff },
     { path: "/gradings", label: "Gradings", icon: Award, show: true },
     { path: "/inventory", label: "Inventory", icon: Package, show: isStaff },
