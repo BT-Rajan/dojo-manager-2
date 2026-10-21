@@ -4,6 +4,7 @@ from fastapi import APIRouter, Response, status
 from sqlalchemy import case, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.guardians import link_guardian
 from app.core.clock import today as academy_today
 from app.core.deps import (
     ANY_ROLE,
@@ -20,6 +21,7 @@ from app.core.deps import (
     require_roles,
     scope_to_branches,
 )
+from app.core.mobile import try_normalize
 from app.models import BeltRank, Branch, Member, Membership, MembershipStatus, MemberStatus
 from app.schemas.dojo import MemberIn, MemberOut, MembershipOut, MemberUpdate, Standing
 
@@ -139,10 +141,16 @@ async def create_member(body: MemberIn, user: CurrentUser, db: DB) -> Member:
     await ensure_exists(db, BeltRank, body.belt_rank_id, "belt_rank_id")
     data = body.model_dump()
     data["joined_on"] = data["joined_on"] or academy_today()
-    member = Member(**data)
+    member = Member(**data, portal_mobile=try_normalize(data["phone"]))
     db.add(member)
     await db.flush()
     member.member_no = f"{branch.code}-{member.id:05d}"
+    # A child registered with a parent's mobile joins that parent's portal family.
+    parent_mobile = try_normalize(member.guardian_phone)
+    if member.guardian_name and parent_mobile:
+        await link_guardian(
+            db, member, full_name=member.guardian_name, mobile=parent_mobile, is_primary=True
+        )
     await db.commit()
     await db.refresh(member, ["belt_rank"])
     return await with_standing(db, member)
@@ -162,6 +170,8 @@ async def update_member(member_id: int, body: MemberUpdate, user: CurrentUser, d
         await get_or_404(db, Branch, data["branch_id"])
     await ensure_exists(db, BeltRank, data.get("belt_rank_id"), "belt_rank_id")
     apply_updates(member, data)
+    if "phone" in data:
+        member.portal_mobile = try_normalize(member.phone)
     await db.commit()
     await db.refresh(member, ["belt_rank"])
     return await with_standing(db, member)

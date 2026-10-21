@@ -87,9 +87,17 @@ DOJO_HOST=0.0.0.0
 DOJO_PORT=8090
 # Plain http://; set to true once the site is served over HTTPS.
 DOJO_COOKIE_SECURE=false
+# Key for member-portal sign-in codes.
+DOJO_PORTAL_SECRET=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
 ENV
   umask 022
   echo "Written (permissions 600). The database password is stored only there."
+fi
+# backend/.env from before the member portal: add its sign-in code key.
+if ! grep -q '^DOJO_PORTAL_SECRET=' "$ENV_FILE"; then
+  printf '# Key for member-portal sign-in codes.\nDOJO_PORTAL_SECRET=%s\n' \
+    "$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" >> "$ENV_FILE"
+  echo "Added DOJO_PORTAL_SECRET to backend/.env"
 fi
 
 DB_HOST="$(app_setting db_host)"
