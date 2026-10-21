@@ -1,5 +1,5 @@
 import re
-from datetime import timedelta
+from datetime import date, timedelta
 
 import pytest
 from sqlalchemy import select, update
@@ -465,4 +465,191 @@ async def test_recent_attendance_shows_visits(owner, branches):
     c = await _sign_in()
     page = (await c.get(f"/api/portal/members/{child['id']}")).json()
     assert [a["session_date"] for a in page["attendance"]] == [past["session_date"]]
+    await c.aclose()
+
+
+# ---------------------------------------------------------------- phase 3: renewals and freezes
+async def _paid_member(owner, branch_id, days=30, **kw):
+    child = await _child(owner, branch_id, **kw)
+    plan = (
+        await owner.post(
+            "/api/plans", json={"name": "Monthly", "duration_days": days, "price": "65.000"}
+        )
+    ).json()
+    r = await owner.post(
+        "/api/memberships",
+        json={
+            "member_id": child["id"],
+            "plan_id": plan["id"],
+            "start_date": today().isoformat(),
+            "payment": {"method": "cash"},
+        },
+    )
+    assert r.status_code == 201, r.text
+    return child, plan, r.json()
+
+
+async def test_online_renewal_round_trip(owner, branches):
+    prm = branches["promenade"]
+    child, plan, first = await _paid_member(owner, prm)
+    c = await _sign_in()
+    url = f"/api/portal/members/{child['id']}"
+    page = (await c.get(url)).json()
+    assert page["renewal"] == {"plan_name": "Monthly", "price": "65.000"}
+    assert len(page["receipts"]) == 1 and page["receipts"][0]["method"] == "cash"
+    assert page["receipts"][0]["lines"][0]["description"] == "Monthly"
+
+    # A declined payment changes nothing.
+    r = (await c.post(f"{url}/renew", json={"method": "knet"})).json()
+    assert r["pay_url"] == f"/portal/pay/{r['reference']}"
+    info = (await c.get(f"/api/portal/renewals/{r['reference']}")).json()
+    assert info["status"] == "pending" and info["amount"] == "65.000"
+    sig = info["test_outcomes"]["decline"]
+    done = await c.post(
+        f"/api/portal/renewals/{r['reference']}/complete", json={"outcome": "decline", "sig": sig}
+    )
+    assert done.json()["status"] == "failed"
+
+    r = (await c.post(f"{url}/renew", json={"method": "card", "lang": "ar"})).json()
+    ref = r["reference"]
+    info = (await c.get(f"/api/portal/renewals/{ref}")).json()
+    # A forged answer is not a payment.
+    bad = await c.post(
+        f"/api/portal/renewals/{ref}/complete", json={"outcome": "approve", "sig": "x" * 32}
+    )
+    assert bad.json()["status"] == "failed"
+    r = (await c.post(f"{url}/renew", json={"method": "card", "lang": "ar"})).json()
+    ref = r["reference"]
+    sig = (await c.get(f"/api/portal/renewals/{ref}")).json()["test_outcomes"]["approve"]
+    done = await c.post(
+        f"/api/portal/renewals/{ref}/complete", json={"outcome": "approve", "sig": sig}
+    )
+    body = done.json()
+    assert body["status"] == "paid" and body["test_outcomes"] is None
+    # The new period starts the day after the current one ends.
+    assert body["end_date"] == (today() + timedelta(days=59)).isoformat()
+    again = await c.post(
+        f"/api/portal/renewals/{ref}/complete", json={"outcome": "approve", "sig": sig}
+    )
+    assert again.json()["status"] == "paid"
+    memberships = (await owner.get(f"/api/members/{child['id']}/memberships")).json()
+    assert len(memberships) == 2
+    payments = (await owner.get("/api/payments", params={"member_id": child["id"]})).json()
+    renewal = [p for p in payments if p["method"] == "card"]
+    assert len(renewal) == 1 and renewal[0]["category"] == "renewal"
+    assert renewal[0]["reference"] == f"TEST-{ref}"
+    msg = (await _messages("renewal_paid"))[-1]
+    assert msg.to == "+96555551111" and "تم تجديد" in msg.text
+    page = (await c.get(url)).json()
+    assert len(page["receipts"]) == 2
+    assert page["membership"]["end_date"] == body["end_date"]
+
+    # Another family cannot see or complete it.
+    await _child(owner, prm, "Stranger", parent_phone="99887766")
+    other = await _sign_in("99887766")
+    assert (await other.get(f"/api/portal/renewals/{ref}")).status_code == 404
+    await other.aclose()
+    await c.aclose()
+
+
+async def test_no_online_renewal_when_plan_withdrawn_or_test_gateway_in_production(
+    owner, branches, monkeypatch
+):
+    from app.core.config import get_settings
+
+    child, plan, _ = await _paid_member(owner, branches["promenade"])
+    c = await _sign_in()
+    url = f"/api/portal/members/{child['id']}"
+    monkeypatch.setattr(get_settings(), "environment", "production")
+    assert (await c.get(url)).json()["renewal"] is None
+    monkeypatch.undo()
+    await owner.patch(f"/api/plans/{plan['id']}", json={"is_active": False})
+    assert (await c.get(url)).json()["renewal"] is None
+    r = await c.post(f"{url}/renew", json={"method": "knet"})
+    assert r.status_code == 422 and "can't be renewed online" in r.json()["detail"]
+    await c.aclose()
+
+
+async def test_freeze_request_and_decision(owner, manager, promenade_admin, branches):
+    prm = branches["promenade"]
+    child, plan, ms = await _paid_member(owner, prm)
+    c = await _sign_in()
+    url = f"/api/portal/members/{child['id']}"
+    body = {"start_date": today().isoformat(), "weeks": 2, "reason": "Travelling"}
+    assert (await c.post(f"{url}/freeze", json=body | {"weeks": 5})).status_code == 422
+    past = (today() - timedelta(days=1)).isoformat()
+    assert (await c.post(f"{url}/freeze", json=body | {"start_date": past})).status_code == 422
+    r = await c.post(f"{url}/freeze", json=body)
+    assert r.status_code == 201, r.text
+    assert (await c.post(f"{url}/freeze", json=body)).status_code == 409
+    page = (await c.get(url)).json()
+    assert page["freeze"] == {"can_request": False, "pending": True, "used": False}
+
+    reqs = (
+        await promenade_admin.get("/api/membership-requests", params={"status": "pending"})
+    ).json()
+    assert len(reqs) == 1 and reqs[0]["from_portal"] is True
+    assert reqs[0]["reason"] == "(Requested in the portal) Travelling"
+    rid = reqs[0]["id"]
+    # Front desk cannot decide; the operations manager does.
+    decision = f"/api/membership-requests/{rid}/decision"
+    assert (await promenade_admin.post(decision, json={"approve": True})).status_code == 403
+    r = await manager.post(decision, json={"approve": True, "note": "OK"})
+    assert r.status_code == 200 and r.json()["status"] == "approved"
+    assert (await manager.post(decision, json={"approve": False})).status_code == 409
+
+    memberships = (await owner.get(f"/api/members/{child['id']}/memberships")).json()
+    assert memberships[0]["end_date"] == (today() + timedelta(days=29 + 14)).isoformat()
+    page = (await c.get(url)).json()
+    assert page["status"] == "frozen"
+    assert page["freeze"] == {"can_request": False, "pending": False, "used": True}
+    family = (await c.get("/api/portal/family")).json()
+    assert family[0]["status"] == "frozen"
+    # Frozen: no classes to book this week.
+    p = await make_program(owner)
+    await _session(owner, prm, p["id"], today() + timedelta(days=1))
+    assert (await c.get(url)).json()["classes"] == []
+    # Once per membership.
+    later = (today() + timedelta(days=20)).isoformat()
+    r = await c.post(f"{url}/freeze", json=body | {"start_date": later})
+    assert r.status_code == 409 and "already been frozen" in r.json()["detail"]
+    await c.aclose()
+
+
+async def test_rejected_freeze_changes_nothing(owner, manager, branches):
+    child, plan, ms = await _paid_member(owner, branches["promenade"])
+    c = await _sign_in()
+    url = f"/api/portal/members/{child['id']}"
+    start = (today() + timedelta(days=3)).isoformat()
+    await c.post(f"{url}/freeze", json={"start_date": start, "weeks": 1, "reason": "Exams"})
+    rid = (await manager.get("/api/membership-requests")).json()[0]["id"]
+    r = await manager.post(f"/api/membership-requests/{rid}/decision", json={"approve": False})
+    assert r.json()["status"] == "rejected"
+    page = (await c.get(url)).json()
+    assert page["status"] == "active"
+    assert page["freeze"] == {"can_request": True, "pending": False, "used": False}
+    await c.aclose()
+
+
+async def test_freeze_applies_to_the_membership_running_at_its_start(owner, manager, branches):
+    child, plan, first = await _paid_member(owner, branches["promenade"])
+    # Renewed in advance: a second membership starts after the first ends.
+    r = await owner.post("/api/memberships", json={"member_id": child["id"], "plan_id": plan["id"]})
+    second = r.json()
+    c = await _sign_in()
+    url = f"/api/portal/members/{child['id']}"
+    start = (today() + timedelta(days=5)).isoformat()
+    await c.post(f"{url}/freeze", json={"start_date": start, "weeks": 1, "reason": "Trip"})
+    req = (await manager.get("/api/membership-requests")).json()[0]
+    assert req["membership_id"] == first["id"]
+    page = (await c.get(url)).json()
+    assert page["freeze"]["pending"] is True and page["freeze"]["can_request"] is False
+    await manager.post(f"/api/membership-requests/{req['id']}/decision", json={"approve": True})
+    memberships = {
+        m["id"]: m for m in (await owner.get(f"/api/members/{child['id']}/memberships")).json()
+    }
+    assert memberships[first["id"]]["end_date"] == (today() + timedelta(days=36)).isoformat()
+    # The membership bought for afterwards moves back by the same week.
+    moved = (date.fromisoformat(second["end_date"]) + timedelta(days=7)).isoformat()
+    assert memberships[second["id"]]["end_date"] == moved
     await c.aclose()

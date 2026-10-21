@@ -1,9 +1,10 @@
 """Member and parent portal: sign-in and the family view."""
 
-from datetime import date, time
+from datetime import date, datetime, time
+from decimal import Decimal
 from typing import Annotated, Literal
 
-from pydantic import StringConstraints
+from pydantic import Field, StringConstraints
 
 from app.schemas.common import InModel, OutModel
 
@@ -113,6 +114,9 @@ class MemberDetailOut(OutModel):
     membership: MembershipBrief | None
     classes: list[ClassRow]
     attendance: list[AttendedRow]
+    renewal: "RenewalOption | None" = None
+    receipts: list["Receipt"] = []
+    freeze: "FreezeInfo | None" = None
 
 
 class BookIn(InModel):
@@ -123,3 +127,66 @@ class BookIn(InModel):
 class BookOut(OutModel):
     status: str
     late_cancellation: bool = False
+
+
+# ---------------------------------------------------------------- money
+class RenewalOption(OutModel):
+    plan_name: str
+    price: Decimal
+
+
+class ReceiptLine(OutModel):
+    description: str
+    amount: Decimal
+
+
+class Receipt(OutModel):
+    reference: str
+    paid_at: datetime
+    amount: Decimal
+    method: str
+    lines: list[ReceiptLine]
+
+
+class FreezeInfo(OutModel):
+    can_request: bool
+    pending: bool
+    used: bool
+
+
+class RenewIn(InModel):
+    method: Literal["knet", "card"] = "knet"
+    lang: Lang = "en"
+
+
+class RenewOut(OutModel):
+    reference: str
+    pay_url: str
+
+
+class RenewalOut(OutModel):
+    reference: str
+    member_id: int
+    plan_name: str
+    amount: Decimal
+    method: str
+    status: str
+    end_date: date | None = None
+    # Test gateway only: the signed Approve / Decline answers.
+    test_outcomes: dict[str, str] | None = None
+
+
+class CompleteIn(InModel):
+    outcome: Annotated[str, StringConstraints(max_length=20)]
+    sig: Annotated[str, StringConstraints(max_length=64)]
+    lang: Lang = "en"
+
+
+class FreezeIn(InModel):
+    start_date: date
+    weeks: Annotated[int, Field(ge=1, le=4)]
+    reason: Annotated[str, StringConstraints(min_length=1, max_length=200)]
+    lang: Lang = "en"
+
+
+MemberDetailOut.model_rebuild()

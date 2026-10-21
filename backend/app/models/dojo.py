@@ -186,6 +186,8 @@ class Membership(TimestampMixin, Base):
     )
     notes: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # One freeze per membership.
+    freeze_used: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
     plan: Mapped[MembershipPlan] = relationship(lazy="selectin")
     member: Mapped[Member] = relationship(lazy="raise")

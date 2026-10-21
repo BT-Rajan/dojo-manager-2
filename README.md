@@ -42,6 +42,14 @@ gradings and seminars, front-desk operations, and inventory.
   at their branch. A full class puts them on the waiting list; when a booked place is freed
   the first in line gets it and is told by WhatsApp. Cancelling less than 2 hours before is
   recorded as late. Recent attendance is listed too.
+  Families renew online (KNET or Visa/Mastercard): the new period starts the day after the
+  current one ends, the payment is recorded as a renewal with its receipt, and a WhatsApp
+  receipt is sent. Until a payment provider is connected, a test payment page with Approve
+  and Decline stands in for the bank (online renewal is off in production while it does).
+  Receipts are listed per member. Families can request a freeze of 1–4 weeks, once per
+  membership; the operations manager approves or rejects it under Operations → Freeze
+  requests, and an approved freeze pauses the membership and moves its end date (and any
+  membership bought for afterwards) by the same weeks.
 - **Regular classes**: members can hold a regular weekly place in a timetable class (member
   page → Regular classes). Regulars count towards class capacity and appear on every class
   roster, with bookings, the waiting list and portal bookings marked.

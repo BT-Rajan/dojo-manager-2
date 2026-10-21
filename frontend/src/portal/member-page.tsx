@@ -1,9 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { portalApi, type MemberDetail } from "./api";
-import { clock, dayLabel, portalDate, useLang } from "./i18n";
+import { clock, dayLabel, kd, portalDate, useLang } from "./i18n";
 import { Notes } from "./ui";
+
+const METHOD_LABEL = { knet: "KNET", card: "Visa / Mastercard", cash: { en: "Cash", ar: "نقداً" } };
+
+function localIso(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 type Note = { kind: "success" | "error"; text: string };
 
@@ -15,6 +21,18 @@ export function MemberPage({ id }: { id: number }) {
   const { data, isLoading, error } = useQuery<MemberDetail>({ queryKey: [url], queryFn: () => portalApi<MemberDetail>(url) });
   const [notes, setNotes] = useState<Note[]>([]);
   const [busy, setBusy] = useState(false);
+  const [, navigate] = useLocation();
+  const [method, setMethod] = useState<"knet" | "card">("knet");
+  const [freeze, setFreeze] = useState({ start: "", weeks: "1", reason: "" });
+
+  // Back from the payment page: show how it went.
+  useEffect(() => {
+    const result = new URLSearchParams(window.location.search).get("renewal");
+    if (result === "paid") setNotes([{ kind: "success", text: t("Payment received — the membership is renewed.", "تم الدفع — تم تجديد الاشتراك.") }]);
+    if (result === "failed") setNotes([{ kind: "error", text: t("The payment didn't go through. Nothing was charged.", "لم تتم عملية الدفع. لم يُخصم أي مبلغ.") }]);
+    if (result) window.history.replaceState(null, "", window.location.pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** Run a portal action, then show its result above the page as the website does. */
   const act = async (fn: () => Promise<Note>) => {
@@ -47,6 +65,28 @@ export function MemberPage({ id }: { id: number }) {
           : t("Cancelled.", "تم الإلغاء."),
       };
     });
+
+  const renew = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const r = await portalApi<{ pay_url: string }>(`${url}/renew`, { method: "POST", body: { method, lang } });
+      navigate(r.pay_url);
+    } catch (err) {
+      setNotes([{ kind: "error", text: err instanceof Error ? err.message : String(err) }]);
+      setBusy(false);
+    }
+  };
+  const sendFreeze = (e: FormEvent) => {
+    e.preventDefault();
+    void act(async () => {
+      await portalApi(`${url}/freeze`, {
+        method: "POST",
+        body: { start_date: freeze.start, weeks: Number(freeze.weeks), reason: freeze.reason, lang },
+      });
+      return { kind: "success", text: t("Freeze request sent to the branch.", "أُرسل طلب التجميد للفرع.") };
+    });
+  };
 
   if (isLoading) return <p className="ea-meta ea-block">{t("Loading…", "جارٍ التحميل…")}</p>;
   if (!data || error) return <NotInFamily />;
@@ -99,6 +139,82 @@ export function MemberPage({ id }: { id: number }) {
               ) : (
                 <p className="ea-meta">{t("No membership yet.", "لا يوجد اشتراك بعد.")}</p>
               )}
+              {data.renewal && (
+                <form className="ea-form" style={{ gap: 10 }} onSubmit={renew}>
+                  <fieldset className="ea-field">
+                    <legend className="ea-label">
+                      {t("Renew online", "التجديد عبر الإنترنت")} · {kd(data.renewal.price, lang)}
+                    </legend>
+                    <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                      {(["knet", "card"] as const).map((m) => (
+                        <label key={m} className="ea-check">
+                          <input type="radio" name="method" value={m} checked={method === m} onChange={() => setMethod(m)} /> {METHOD_LABEL[m]}
+                        </label>
+                      ))}
+                    </div>
+                    <span className="ea-hint">
+                      {t(
+                        "The new period starts the day after the current one ends. Discounts are applied at the branch.",
+                        "تبدأ الفترة الجديدة في اليوم التالي لانتهاء الحالية. الخصومات تُطبّق في الفرع.",
+                      )}
+                    </span>
+                  </fieldset>
+                  <button className="ea-btn ea-btn--primary" disabled={busy}>
+                    {t("Pay and renew", "ادفع وجدّد")}
+                  </button>
+                </form>
+              )}
+              {data.freeze && !data.freeze.used &&
+                (data.freeze.pending ? (
+                  <p className="ea-meta">{t("Freeze request waiting for the branch.", "طلب التجميد بانتظار الفرع.")}</p>
+                ) : (
+                  <details>
+                    <summary className="ea-meta">{t("Request a freeze (1–4 weeks, once per membership)", "طلب تجميد (1–4 أسابيع، مرة لكل اشتراك)")}</summary>
+                    <form className="ea-form" style={{ marginBlockStart: 8 }} onSubmit={sendFreeze}>
+                      <div className="ea-field">
+                        <label className="ea-label" htmlFor="fs">
+                          {t("Start", "البداية")}
+                        </label>
+                        <input
+                          className="ea-input"
+                          id="fs"
+                          type="date"
+                          dir="ltr"
+                          min={localIso(new Date())}
+                          required
+                          value={freeze.start}
+                          onChange={(e) => setFreeze({ ...freeze, start: e.target.value })}
+                        />
+                      </div>
+                      <div className="ea-field">
+                        <label className="ea-label" htmlFor="fw">
+                          {t("Weeks", "الأسابيع")}
+                        </label>
+                        <select className="ea-input" id="fw" value={freeze.weeks} onChange={(e) => setFreeze({ ...freeze, weeks: e.target.value })}>
+                          {["1", "2", "3", "4"].map((w) => (
+                            <option key={w}>{w}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="ea-field">
+                        <label className="ea-label" htmlFor="fr">
+                          {t("Reason", "السبب")}
+                        </label>
+                        <input
+                          className="ea-input"
+                          id="fr"
+                          maxLength={200}
+                          required
+                          value={freeze.reason}
+                          onChange={(e) => setFreeze({ ...freeze, reason: e.target.value })}
+                        />
+                      </div>
+                      <button className="ea-btn ea-btn--ghost" disabled={busy || !freeze.start || !freeze.reason.trim()}>
+                        {t("Send request", "إرسال الطلب")}
+                      </button>
+                    </form>
+                  </details>
+                ))}
             </div>
           </section>
 
@@ -150,6 +266,33 @@ export function MemberPage({ id }: { id: number }) {
               )}
             </div>
           </section>
+
+          {data.receipts.length > 0 && (
+            <section className="ea-card" aria-labelledby="h-rc">
+              <div className="ea-card-body" style={{ display: "grid", gap: 8 }}>
+                <h2 className="ea-h3" id="h-rc">
+                  {t("Receipts", "الإيصالات")}
+                </h2>
+                {data.receipts.map((r) => (
+                  <details key={r.reference}>
+                    <summary>
+                      {portalDate(r.paid_at)} · <span dir="ltr">{r.reference}</span> · {kd(r.amount, lang)}
+                    </summary>
+                    <ul style={{ margin: "6px 0 0", paddingInlineStart: 20 }}>
+                      {r.lines.map((l, i) => (
+                        <li key={i}>
+                          {l.description} · {kd(l.amount, lang)}
+                        </li>
+                      ))}
+                      <li className="ea-meta">
+                        {r.method === "cash" ? METHOD_LABEL.cash[lang] : METHOD_LABEL[r.method]} · {kd(r.amount, lang)}
+                      </li>
+                    </ul>
+                  </details>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       </section>
     </>
