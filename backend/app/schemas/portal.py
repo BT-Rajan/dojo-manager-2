@@ -117,6 +117,10 @@ class MemberDetailOut(OutModel):
     renewal: "RenewalOption | None" = None
     receipts: list["Receipt"] = []
     freeze: "FreezeInfo | None" = None
+    progress: list["ProgressOut"] = []
+    consent: "ConsentBrief | None" = None
+    rules_signed: bool = False
+    signer: str = ""
 
 
 class BookIn(InModel):
@@ -189,4 +193,73 @@ class FreezeIn(InModel):
     lang: Lang = "en"
 
 
+# ---------------------------------------------------------------- progress, photos and rules
+class ProgressBelt(OutModel):
+    id: int
+    name: str
+    name_ar: str | None
+    color: str
+    bjj_stripe: str | None
+    bjj_stripe_ar: str | None
+
+
+class ProgressCheck(OutModel):
+    code: str
+    en: str
+    ar: str
+    have: int
+    need: int
+    ok: bool
+
+
+class ProgressTest(OutModel):
+    event_date: date
+    title: str
+
+
+class ProgressEvaluation(OutModel):
+    eval_date: date
+    instructor_name: str | None
+    notes: str | None
+
+
+class ProgressNoteBrief(OutModel):
+    month: date
+    worked_on: str
+    next_steps: str
+
+
+class ProgressOut(OutModel):
+    belt: ProgressBelt
+    stripes: int
+    next: ProgressBelt | None
+    done: int
+    total: int
+    seminars: int
+    checks: list[ProgressCheck]
+    tests: list[ProgressTest]
+    evaluations: list[ProgressEvaluation]
+    notes: list[ProgressNoteBrief]
+
+
+class ConsentBrief(OutModel):
+    internal_records: bool
+    social_media: bool
+    website_marketing: bool
+
+
+class ConsentIn(InModel):
+    internal: bool
+    social: bool
+    website: bool
+    lang: Lang = "en"
+
+
+class RulesIn(InModel):
+    name: Annotated[str, StringConstraints(max_length=150)]
+    agree: bool
+    lang: Lang = "en"
+
+
+# MemberDetailOut refers to models defined after it.
 MemberDetailOut.model_rebuild()

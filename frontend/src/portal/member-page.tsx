@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { portalApi, type MemberDetail } from "./api";
 import { clock, dayLabel, kd, portalDate, useLang } from "./i18n";
-import { Notes } from "./ui";
+import { Belt, Notes } from "./ui";
 
 const METHOD_LABEL = { knet: "KNET", card: "Visa / Mastercard", cash: { en: "Cash", ar: "نقداً" } };
 
@@ -24,6 +24,8 @@ export function MemberPage({ id }: { id: number }) {
   const [, navigate] = useLocation();
   const [method, setMethod] = useState<"knet" | "card">("knet");
   const [freeze, setFreeze] = useState({ start: "", weeks: "1", reason: "" });
+  const [photos, setPhotos] = useState<{ internal: boolean; social: boolean; website: boolean } | null>(null);
+  const [rules, setRules] = useState({ agree: false, name: "" });
 
   // Back from the payment page: show how it went.
   useEffect(() => {
@@ -86,6 +88,27 @@ export function MemberPage({ id }: { id: number }) {
       });
       return { kind: "success", text: t("Freeze request sent to the branch.", "أُرسل طلب التجميد للفرع.") };
     });
+  };
+
+  const savePhotos = (e: FormEvent) => {
+    e.preventDefault();
+    void act(async () => {
+      await portalApi(`${url}/consent`, { method: "POST", body: { ...currentPhotos, lang } });
+      setPhotos(null);
+      return { kind: "success", text: t("Photo choices saved.", "تم حفظ اختيارات الصور.") };
+    });
+  };
+  const signRules = (e: FormEvent) => {
+    e.preventDefault();
+    void act(async () => {
+      await portalApi(`${url}/rules`, { method: "POST", body: { ...rules, lang } });
+      return { kind: "success", text: t("Thank you — rules signed.", "شكراً — تم توقيع القواعد.") };
+    });
+  };
+  const currentPhotos = photos ?? {
+    internal: !!data?.consent?.internal_records,
+    social: !!data?.consent?.social_media,
+    website: !!data?.consent?.website_marketing,
   };
 
   if (isLoading) return <p className="ea-meta ea-block">{t("Loading…", "جارٍ التحميل…")}</p>;
@@ -267,6 +290,77 @@ export function MemberPage({ id }: { id: number }) {
             </div>
           </section>
 
+
+          {data.progress.map((p, i) => (
+            <section key={i} className="ea-card" aria-labelledby={`h-pr${i}`}>
+              <div className="ea-card-body" style={{ display: "grid", gap: 12 }}>
+                <h2 className="ea-h3" id={`h-pr${i}`}>
+                  {t("Progress", "التقدم")} · {t("Kajukenbo", "كاجوكينبو")}
+                </h2>
+                <p>
+                  <span className="ea-rank">
+                    <Belt color={p.belt.color} />
+                    {lang === "ar" && p.belt.name_ar ? p.belt.name_ar : p.belt.name}
+                  </span>
+                  {(lang === "ar" ? p.belt.bjj_stripe_ar || p.belt.bjj_stripe : p.belt.bjj_stripe) && (
+                    <> · {lang === "ar" ? p.belt.bjj_stripe_ar || p.belt.bjj_stripe : p.belt.bjj_stripe}</>
+                  )}
+                </p>
+                <p className="ea-meta">
+                  {t("Skills achieved at this belt", "المهارات المنجزة في هذا الحزام")}:{" "}
+                  <b dir="ltr">
+                    {p.done}/{p.total}
+                  </b>{" "}
+                  · {t("Seminar points", "نقاط الندوات")}: <b dir="ltr">{p.seminars}</b>
+                </p>
+                {p.next && (
+                  <div>
+                    <p className="ea-label" style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                      {t("Next belt", "الحزام التالي")}: <Belt color={p.next.color} width={24} />{" "}
+                      {lang === "ar" && p.next.name_ar ? p.next.name_ar : p.next.name}
+                    </p>
+                    <ul style={{ margin: "6px 0 0", paddingInlineStart: 20 }}>
+                      {p.checks.map((c) => (
+                        <li key={c.code}>
+                          <span aria-hidden="true">{c.ok ? "✓" : "○"}</span>
+                          <span className="ea-sr">{c.ok ? t("done", "مكتمل") : t("not yet", "لم يكتمل")}</span> {lang === "ar" ? c.ar : c.en}
+                          {c.code !== "ready" && (
+                            <span dir="ltr">
+                              {" "}
+                              ({c.have}/{c.need})
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {p.tests.map((test, k) => (
+                  <p key={k} className="ea-note ea-note--success">
+                    {t("Test day", "يوم الاختبار")}: {portalDate(test.event_date)}
+                  </p>
+                ))}
+                {p.evaluations.map((ev, k) => (
+                  <blockquote key={k}>
+                    <p className="ea-meta">
+                      {portalDate(ev.eval_date)}
+                      {ev.instructor_name && ` · ${ev.instructor_name}`}
+                    </p>
+                    <p style={{ margin: 0 }}>{ev.notes}</p>
+                  </blockquote>
+                ))}
+                {p.notes.map((n, k) => (
+                  <div key={k}>
+                    <p className="ea-meta">
+                      {t("Monthly note", "التقرير الشهري")} · <span dir="ltr">{n.month.slice(5, 7)}/{n.month.slice(0, 4)}</span>
+                    </p>
+                    <p style={{ margin: 0 }}>{n.worked_on}</p>
+                    <p style={{ margin: 0 }}>{n.next_steps}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
           {data.receipts.length > 0 && (
             <section className="ea-card" aria-labelledby="h-rc">
               <div className="ea-card-body" style={{ display: "grid", gap: 8 }}>
@@ -293,6 +387,66 @@ export function MemberPage({ id }: { id: number }) {
               </div>
             </section>
           )}
+
+          <section className="ea-card" aria-labelledby="h-cn">
+            <div className="ea-card-body" style={{ display: "grid", gap: 12 }}>
+              <h2 className="ea-h3" id="h-cn">
+                {t("Photos and rules", "الصور والقواعد")}
+              </h2>
+              <form className="ea-form" style={{ gap: 8 }} onSubmit={savePhotos}>
+                <fieldset className="ea-field" style={{ gap: 6 }}>
+                  <legend className="ea-label">{t("Photos and videos may be used for", "يمكن استخدام الصور والفيديو في")}</legend>
+                  {(
+                    [
+                      ["internal", t("Internal records (progress, belt tests)", "السجلات الداخلية (التقدم واختبارات الأحزمة)")],
+                      ["social", t("The academy's social media", "حسابات الأكاديمية في التواصل الاجتماعي")],
+                      ["website", t("Website and marketing", "الموقع والتسويق")],
+                    ] as const
+                  ).map(([key, text]) => (
+                    <label key={key} className="ea-check">
+                      <input
+                        type="checkbox"
+                        checked={currentPhotos[key]}
+                        onChange={(e) => setPhotos({ ...currentPhotos, [key]: e.target.checked })}
+                      />{" "}
+                      {text}
+                    </label>
+                  ))}
+                </fieldset>
+                <span className="ea-hint">{t("Withdrawing takes effect straight away.", "السحب يسري فوراً.")}</span>
+                <button className="ea-btn ea-btn--ghost" disabled={busy}>
+                  {t("Save photo choices", "حفظ اختيارات الصور")}
+                </button>
+              </form>
+              {data.rules_signed ? (
+                <p className="ea-meta">✓ {t("Academy rules signed.", "تم توقيع قواعد الأكاديمية.")}</p>
+              ) : (
+                <form className="ea-form" style={{ gap: 8 }} onSubmit={signRules}>
+                  <p style={{ margin: 0 }}>{t("Please read and sign the academy rules.", "يرجى قراءة قواعد الأكاديمية وتوقيعها.")}</p>
+                  <label className="ea-check">
+                    <input type="checkbox" required checked={rules.agree} onChange={(e) => setRules({ ...rules, agree: e.target.checked })} />{" "}
+                    {t("I have read and agree to the academy rules", "قرأت قواعد الأكاديمية وأوافق عليها")}
+                  </label>
+                  <div className="ea-field">
+                    <label className="ea-label" htmlFor="sn">
+                      {t("Type your full name to sign", "اكتب اسمك الكامل للتوقيع")}
+                    </label>
+                    <input
+                      className="ea-input"
+                      id="sn"
+                      required
+                      placeholder={data.signer}
+                      value={rules.name}
+                      onChange={(e) => setRules({ ...rules, name: e.target.value })}
+                    />
+                  </div>
+                  <button className="ea-btn ea-btn--primary" disabled={busy || !rules.agree || !rules.name.trim()}>
+                    {t("Sign", "توقيع")}
+                  </button>
+                </form>
+              )}
+            </div>
+          </section>
         </div>
       </section>
     </>

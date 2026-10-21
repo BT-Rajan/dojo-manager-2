@@ -6,6 +6,7 @@ import { Page } from "@/components/layout/page";
 import { BeltSwatch, Empty, EnumSelect, Field, Loading, RecordSelect, StatusBadge } from "@/components/common";
 import { MemberForm, toPayload } from "@/components/common/member-form";
 import { FamilyCard } from "@/components/members/family-card";
+import { ProgressTab } from "@/components/members/progress-tab";
 import { RegularClassesCard } from "@/components/members/regular-classes-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -152,8 +153,13 @@ export default function MemberDetail() {
                 <TabsTrigger value="memberships">Memberships</TabsTrigger>
                 {isStaff && <TabsTrigger value="payments">Payments</TabsTrigger>}
                 <TabsTrigger value="attendance">Attendance</TabsTrigger>
+                <TabsTrigger value="progress">Progress</TabsTrigger>
                 {isStaff && <TabsTrigger value="followups">Follow-ups</TabsTrigger>}
               </TabsList>
+
+              <TabsContent value="progress">
+                <ProgressTab member={member} />
+              </TabsContent>
 
               <TabsContent value="memberships">
                 {loading_memberships ? <Loading /> : memberships.length === 0 ? (

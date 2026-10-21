@@ -98,6 +98,13 @@ class BeltRank(TimestampMixin, Base):
     bjj_stripe: Mapped[str | None] = mapped_column(String(100))
     bjj_equivalent: Mapped[str | None] = mapped_column(String(100))
     seminars_required: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")
+    # Shown to families in Arabic.
+    name_ar: Mapped[str | None] = mapped_column(String(100))
+    bjj_stripe_ar: Mapped[str | None] = mapped_column(String(100))
+    # Needed since the last belt before testing for this one.
+    min_classes: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")
+    min_weeks: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")
+    min_evaluations: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")
 
 
 class Instructor(TimestampMixin, Base):

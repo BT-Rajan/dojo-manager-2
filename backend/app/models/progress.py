@@ -190,3 +190,117 @@ class Complaint(TimestampMixin, Base):
         db_enum(CaseStatus), default=CaseStatus.OPEN, server_default="open"
     )
     closed_on: Mapped[date | None] = mapped_column(Date)
+
+
+# ---------------------------------------------------------------- curriculum and progress
+class Track(enum.StrEnum):
+    KICKBOXING = "kickboxing"
+    JIUJITSU = "jiujitsu"
+    SELF_DEFENCE = "self_defence"
+
+
+class BeltSkill(Base):
+    """A skill a student learns at a belt, in one of the three tracks."""
+
+    __tablename__ = "belt_skills"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    belt_rank_id: Mapped[int] = mapped_column(
+        ForeignKey("belt_ranks.id", ondelete="CASCADE"), index=True
+    )
+    track: Mapped[Track] = mapped_column(db_enum(Track))
+    category: Mapped[str] = mapped_column(String(40))
+    name: Mapped[str] = mapped_column(String(120))
+    sort_order: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
+
+
+class SkillCheck(Base):
+    """A skill the student has shown, ticked off by a coach."""
+
+    __tablename__ = "member_skill_checks"
+
+    member_id: Mapped[int] = mapped_column(
+        ForeignKey("members.id", ondelete="CASCADE"), primary_key=True
+    )
+    skill_id: Mapped[int] = mapped_column(
+        ForeignKey("belt_skills.id", ondelete="CASCADE"), primary_key=True
+    )
+    checked_on: Mapped[date] = mapped_column(Date)
+    checked_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+
+class Evaluation(TimestampMixin, Base):
+    """A coach's evaluation every 4–6 weeks: notes for the family and whether the student is
+    ready for the next belt test."""
+
+    __tablename__ = "evaluations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("members.id", ondelete="CASCADE"), index=True)
+    belt_rank_id: Mapped[int | None] = mapped_column(ForeignKey("belt_ranks.id"))
+    eval_date: Mapped[date] = mapped_column(Date)
+    instructor_id: Mapped[int | None] = mapped_column(ForeignKey("instructors.id"))
+    notes: Mapped[str | None] = mapped_column(Text)
+    ready_for_test: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    recorded_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+
+class NoteStatus(enum.StrEnum):
+    DRAFT = "draft"
+    SENT = "sent"
+
+
+class ProgressNote(TimestampMixin, Base):
+    """The monthly note to the family: what the student worked on and what comes next."""
+
+    __tablename__ = "progress_notes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("members.id", ondelete="CASCADE"), index=True)
+    month: Mapped[date] = mapped_column(Date)  # first day of the month described
+    instructor_id: Mapped[int | None] = mapped_column(ForeignKey("instructors.id"))
+    worked_on: Mapped[str] = mapped_column(Text)
+    next_steps: Mapped[str] = mapped_column(Text)
+    status: Mapped[NoteStatus] = mapped_column(
+        db_enum(NoteStatus), default=NoteStatus.DRAFT, server_default="draft"
+    )
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+
+# ---------------------------------------------------------------- consent and rules
+class MediaConsent(Base):
+    """Photo and video consent (EA-MKT-FRM-01). Each change is a new row, so the history of
+    what was agreed and when is kept; the newest row is the member's current consent."""
+
+    __tablename__ = "media_consents"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("members.id", ondelete="CASCADE"), index=True)
+    internal_records: Mapped[bool] = mapped_column(Boolean, default=False)
+    social_media: Mapped[bool] = mapped_column(Boolean, default=False)
+    website_marketing: Mapped[bool] = mapped_column(Boolean, default=False)
+    signed_by_name: Mapped[str] = mapped_column(String(150))  # parent/guardian, or the adult
+    signed_at: Mapped[datetime] = mapped_column(DateTime)
+    recorded_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    from_portal: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    notes: Mapped[str | None] = mapped_column(String(255))
+
+
+RULES_VERSION = "2026-1"
+
+
+class RulesAgreement(Base):
+    """Agreement to the academy rules and safety instructions."""
+
+    __tablename__ = "rules_agreements"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("members.id", ondelete="CASCADE"), index=True)
+    rules_version: Mapped[str] = mapped_column(String(20), default=RULES_VERSION)
+    signed_by_name: Mapped[str] = mapped_column(String(150))
+    signature: Mapped[str] = mapped_column(String(255))  # "typed:<name>" when signed in the portal
+    signed_at: Mapped[datetime] = mapped_column(DateTime)
+    recorded_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    from_portal: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")

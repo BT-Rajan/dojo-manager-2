@@ -20,9 +20,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.db import dispose_engine, get_sessionmaker
 from app.core.security import hash_password
+from app.curriculum import BELT_EXTRAS, BELT_KEYS, SKILLS
 from app.models import (
     BeltPhase,
     BeltRank,
+    BeltSkill,
     Branch,
     ClassSchedule,
     Discipline,
@@ -31,6 +33,7 @@ from app.models import (
     MembershipPlan,
     Program,
     Role,
+    Track,
     User,
 )
 
@@ -112,9 +115,26 @@ async def seed_reference(db: AsyncSession) -> None:
                 bjj_stripe=stripe,
                 bjj_equivalent=bjj,
                 seminars_required=sem,
+                name_ar=BELT_EXTRAS[key][0],
+                bjj_stripe_ar=BELT_EXTRAS[key][2],
+                min_classes=BELT_EXTRAS[key][3],
+                min_weeks=BELT_EXTRAS[key][4],
+                min_evaluations=BELT_EXTRAS[key][5],
             )
-            for i, (n, c, p, stripe, bjj, sem) in enumerate(BELTS, start=1)
+            for i, ((n, c, p, stripe, bjj, sem), key) in enumerate(
+                zip(BELTS, BELT_KEYS, strict=True), start=1
+            )
         )
+        await db.flush()
+    if await _empty(db, BeltSkill):
+        belts = list(await db.scalars(select(BeltRank).order_by(BeltRank.sort_order)))
+        if len(belts) == len(BELT_KEYS):
+            db.add_all(
+                BeltSkill(belt_rank_id=belt.id, track=track, category=cat, name=name, sort_order=i)
+                for belt, key in zip(belts, BELT_KEYS, strict=True)
+                for track in Track
+                for i, (cat, name) in enumerate(SKILLS.get(f"{track.value}:{key}", []))
+            )
     if await _empty(db, MembershipPlan):
         db.add_all(
             MembershipPlan(

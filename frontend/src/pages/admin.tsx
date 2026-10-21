@@ -16,7 +16,8 @@ import { useBranch, useBranches } from "@/hooks/useBranch";
 import { useBelts, useInstructors, usePrograms } from "@/hooks/useLookups";
 import { ROLE_LABELS, fmtDateTime, kd, label } from "@/lib/format";
 import { api } from "@/lib/queryClient";
-import type { Branch, Plan, PortalAccess, Role, User } from "@/lib/types";
+import type { Belt, Branch, Plan, PortalAccess, Role, User } from "@/lib/types";
+import { BeltCurriculumDialog } from "@/components/members/belt-curriculum";
 
 const ROLES: Role[] = ["owner", "manager", "branch_admin", "instructor"];
 
@@ -496,6 +497,7 @@ function CatalogTab() {
     { invalidate: ["/api/plans"] },
   );
   const branchName = (id: number | null) => (id ? branches.find((b) => b.id === id)?.name : "All branches");
+  const [curriculum, setCurriculum] = useState<Belt | null>(null);
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -548,6 +550,7 @@ function CatalogTab() {
       </div>
       <div className="space-y-3">
         <h3 className="font-semibold">Belt system</h3>
+        <p className="text-xs text-muted-foreground">Open a belt to set its test requirements, Arabic name and skills.</p>
         <Table>
           <TableHeader>
             <TableRow>
@@ -561,8 +564,13 @@ function CatalogTab() {
             {belts.map((b) => (
               <TableRow key={b.id}>
                 <TableCell>
-                  <BeltSwatch color={b.color} name={b.name} />
-                  <div className="text-xs text-muted-foreground">{label(b.phase)}</div>
+                  <button className="text-left hover:underline" onClick={() => setCurriculum(b)}>
+                    <BeltSwatch color={b.color} name={b.name} />
+                  </button>
+                  <div className="text-xs text-muted-foreground">
+                    {label(b.phase)}
+                    {b.min_classes > 0 && ` · ${b.min_classes} classes, ${b.min_weeks} weeks`}
+                  </div>
                 </TableCell>
                 <TableCell>{b.bjj_stripe ?? "—"}</TableCell>
                 <TableCell>{b.bjj_equivalent ?? "—"}</TableCell>
@@ -623,6 +631,9 @@ function CatalogTab() {
             Save
           </Button>
         </DialogContent>
+      </Dialog>
+      <Dialog open={!!curriculum} onOpenChange={(o) => !o && setCurriculum(null)}>
+        {curriculum && <BeltCurriculumDialog belt={curriculum} onClose={() => setCurriculum(null)} />}
       </Dialog>
     </div>
   );
