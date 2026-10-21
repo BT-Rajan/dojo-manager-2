@@ -40,6 +40,8 @@ from app.models import (
     RulesAgreement,
 )
 from app.schemas.portal import (
+    AccountIn,
+    AccountOut,
     BookIn,
     BookOut,
     CompleteIn,
@@ -266,9 +268,12 @@ async def logout(request: Request, response: Response, db: DB) -> None:
 
 @router.get("/me", response_model=PortalMe)
 async def me(session: Family, db: DB) -> dict:
+    name = await ps.profile_name(db, session)
+    name_ar = await ps.profile_name(db, session, "ar")
     return {
         "kind": "guardian" if session.guardian_id else "member",
-        "name": await ps.profile_name(db, session),
+        "name": name,
+        "name_ar": name_ar if name_ar != name else None,  # only when one is recorded
         "mobile": session.mobile,
     }
 
@@ -279,6 +284,13 @@ async def _class_title(db: AsyncSession, s: ClassSession) -> str:
         return s.title
     program = await db.get(Program, s.program_id)
     return program.name if program else "Class"
+
+
+async def _class_title_ar(db: AsyncSession, s: ClassSession) -> str | None:
+    if s.title:
+        return None
+    program = await db.get(Program, s.program_id)
+    return program.name_ar if program else None
 
 
 @router.get("/family", response_model=list[FamilyMemberOut])
@@ -306,8 +318,11 @@ async def family(session: Family, db: DB) -> list[dict]:
                 "id": m.id,
                 "first_name": m.first_name,
                 "last_name": m.last_name,
+                "first_name_ar": m.first_name_ar,
+                "last_name_ar": m.last_name_ar,
                 "branch_id": m.branch_id,
                 "branch_name": branch.name,
+                "branch_name_ar": branch.name_ar,
                 "branch_code": branch.code,
                 "rank": rank,
                 "next_class": {
@@ -316,6 +331,7 @@ async def family(session: Family, db: DB) -> list[dict]:
                     "start_time": nxt.start_time,
                     "end_time": nxt.end_time,
                     "title": await _class_title(db, nxt),
+                    "title_ar": await _class_title_ar(db, nxt),
                 }
                 if nxt
                 else None,
@@ -364,6 +380,7 @@ async def member_page(member_id: int, session: Family, db: DB) -> dict:
                 "start_time": s.start_time,
                 "end_time": s.end_time,
                 "title": await _class_title(db, s),
+                "title_ar": await _class_title_ar(db, s),
                 "regular": r["regular"],
                 "booking": {"status": r["booking"].status} if r["booking"] else None,
                 "can_book": r["can_book"],
@@ -374,6 +391,7 @@ async def member_page(member_id: int, session: Family, db: DB) -> dict:
             "session_date": s.session_date,
             "start_time": s.start_time,
             "title": await _class_title(db, s),
+            "title_ar": await _class_title_ar(db, s),
             "status": a.status,
         }
         for s, a in await ps.recent_attendance(db, member)
@@ -389,7 +407,10 @@ async def member_page(member_id: int, session: Family, db: DB) -> dict:
             "id": member.id,
             "first_name": member.first_name,
             "last_name": member.last_name,
+            "first_name_ar": member.first_name_ar,
+            "last_name_ar": member.last_name_ar,
             "branch_name": branch.name,
+            "branch_name_ar": branch.name_ar,
             "branch_code": branch.code,
         },
         "status": info.code,
@@ -581,3 +602,31 @@ async def sign_rules(member_id: int, body: RulesIn, session: Family, db: DB) -> 
     audit(db, None, "rules_signed_in_portal", "member", member.id)
     await db.commit()
     return {"id": agreement.id}
+
+
+# ---------------------------------------------------------------- account and messages
+@router.get("/account", response_model=AccountOut)
+async def account(session: Family, db: DB) -> dict:
+    """The family, the sign-in mobile, email, WhatsApp choices and recent messages."""
+    from app.services.messaging import opted_in, service_messages_on
+
+    members = await ps.family(db, session)
+    profile = await ps.profile(db, session)
+    return {
+        "family": members,
+        "email": profile.email if profile else None,
+        "mobile": session.mobile,
+        "service_on": await service_messages_on(db, session.mobile),
+        "broadcasts_on": any([await opted_in(db, m.id) for m in members]),
+        "recent": await ps.recent_messages(db, session),
+    }
+
+
+@router.post("/account", response_model=AccountOut)
+async def save_account(body: AccountIn, session: Family, db: DB) -> dict:
+    await ps.update_email(db, session, body.email)
+    await ps.set_messages(db, session, body.service, body.broadcasts)
+    await ps.remember_language(db, session, body.lang)
+    audit(db, None, "portal_account_saved", "mobile", None, mobile=session.mobile[-4:])
+    await db.commit()
+    return await account(session, db)

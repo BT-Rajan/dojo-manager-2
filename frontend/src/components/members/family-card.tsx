@@ -15,7 +15,7 @@ import { api } from "@/lib/queryClient";
 import type { GuardianLink, Member } from "@/lib/types";
 
 const RELATIONSHIPS = ["father", "mother", "guardian", "other"];
-const blank = { full_name: "", mobile: "", email: "", relationship: "mother", is_primary: false };
+const blank = { full_name: "", full_name_ar: "", mobile: "", email: "", relationship: "mother", is_primary: false };
 
 /** Who can open this member's page in the member portal: linked parents, or the member. */
 export function FamilyCard({ member }: { member: Member }) {
@@ -27,7 +27,7 @@ export function FamilyCard({ member }: { member: Member }) {
   const inv = { invalidate: [url] };
   const save = useApiMutation(
     () => {
-      const body = { ...f, email: f.email || null };
+      const body = { ...f, email: f.email || null, full_name_ar: f.full_name_ar || null };
       return editing === "new"
         ? api(url, { method: "POST", body })
         : api(`${url}/${(editing as GuardianLink).guardian_id}`, { method: "PATCH", body });
@@ -89,7 +89,14 @@ export function FamilyCard({ member }: { member: Member }) {
                     variant="ghost"
                     aria-label={`Edit ${g.full_name}`}
                     onClick={() => {
-                      setF({ full_name: g.full_name, mobile: g.mobile, email: g.email ?? "", relationship: g.relationship, is_primary: g.is_primary });
+                      setF({
+                        full_name: g.full_name,
+                        full_name_ar: g.full_name_ar ?? "",
+                        mobile: g.mobile,
+                        email: g.email ?? "",
+                        relationship: g.relationship,
+                        is_primary: g.is_primary,
+                      });
                       setEditing(g);
                     }}
                   >
@@ -125,6 +132,9 @@ export function FamilyCard({ member }: { member: Member }) {
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Full name">
               <Input value={f.full_name} onChange={(e) => setF({ ...f, full_name: e.target.value })} />
+            </Field>
+            <Field label="Full name (Arabic)">
+              <Input dir="rtl" value={f.full_name_ar} onChange={(e) => setF({ ...f, full_name_ar: e.target.value })} />
             </Field>
             <Field label="Mobile (Kuwait, 8 digits)">
               <Input inputMode="tel" value={f.mobile} onChange={(e) => setF({ ...f, mobile: e.target.value })} />

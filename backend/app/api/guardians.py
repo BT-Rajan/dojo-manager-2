@@ -17,6 +17,7 @@ router = APIRouter(tags=["guardians"], dependencies=[require_roles(*STAFF)])
 
 class GuardianLinkIn(InModel):
     full_name: Name
+    full_name_ar: Name | None = None
     mobile: str
     email: EmailStr | None = None
     relationship: Relationship = Relationship.GUARDIAN
@@ -25,6 +26,7 @@ class GuardianLinkIn(InModel):
 
 class GuardianLinkUpdate(InModel):
     full_name: Name | None = None
+    full_name_ar: Name | None = None
     mobile: str | None = None
     email: EmailStr | None = None
     relationship: Relationship | None = None
@@ -35,6 +37,7 @@ class GuardianLinkOut(OutModel):
     guardian_id: int
     member_id: int
     full_name: str
+    full_name_ar: str | None = None
     mobile: str
     email: str | None
     relationship: Relationship
@@ -61,6 +64,7 @@ async def _out(db: AsyncSession, link: GuardianLink) -> dict:
         "guardian_id": g.id,
         "member_id": link.member_id,
         "full_name": g.full_name,
+        "full_name_ar": g.full_name_ar,
         "mobile": g.mobile,
         "email": g.email,
         "relationship": link.relationship,
@@ -87,6 +91,7 @@ async def link_guardian(
     full_name: str,
     mobile: str,
     email: str | None = None,
+    full_name_ar: str | None = None,
     relationship: Relationship = Relationship.GUARDIAN,
     is_primary: bool = False,
 ) -> GuardianLink:
@@ -94,7 +99,9 @@ async def link_guardian(
     a second child registered with the same parent mobile joins the same family."""
     guardian = await db.scalar(select(Guardian).where(Guardian.mobile == mobile).limit(1))
     if guardian is None:
-        guardian = Guardian(full_name=full_name, mobile=mobile, email=email)
+        guardian = Guardian(
+            full_name=full_name, full_name_ar=full_name_ar, mobile=mobile, email=email
+        )
         db.add(guardian)
         await db.flush()
     elif await db.get(GuardianLink, (guardian.id, member.id)) is not None:
@@ -142,6 +149,7 @@ async def add_guardian(member_id: int, body: GuardianLinkIn, user: CurrentUser, 
         db,
         member,
         full_name=body.full_name,
+        full_name_ar=body.full_name_ar,
         mobile=_mobile(body.mobile),
         email=body.email,
         relationship=body.relationship,
@@ -169,7 +177,7 @@ async def update_guardian(
         if clash is not None:
             raise HTTPException(status.HTTP_409_CONFLICT, "Another guardian has this mobile")
         g.mobile = mobile
-    for field in ("full_name", "email"):
+    for field in ("full_name", "full_name_ar", "email"):
         if field in data:
             setattr(g, field, data[field])
     if data.get("relationship") is not None:

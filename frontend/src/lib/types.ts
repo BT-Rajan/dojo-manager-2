@@ -5,6 +5,7 @@ export type Role = "owner" | "manager" | "branch_admin" | "instructor";
 export interface Branch {
   id: number;
   name: string;
+  name_ar?: string | null;
   code: string;
   address: string | null;
   phone: string | null;
@@ -25,6 +26,7 @@ export interface User {
 export interface Program {
   id: number;
   name: string;
+  name_ar?: string | null;
   discipline: string;
   description: string | null;
   min_age: number | null;
@@ -70,6 +72,8 @@ export interface Member {
   member_no: string | null;
   first_name: string;
   last_name: string;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
   full_name: string;
   date_of_birth: string | null;
   age: number | null;
@@ -470,6 +474,7 @@ export interface GuardianLink {
   guardian_id: number;
   member_id: number;
   full_name: string;
+  full_name_ar: string | null;
   mobile: string;
   email: string | null;
   relationship: string;
@@ -550,4 +555,21 @@ export interface MemberProgress {
   consent_history: Consent[];
   rules_signed: { rules_version: string; signed_by_name: string; signed_at: string; from_portal: boolean } | null;
   rules_version: string;
+}
+
+export interface FamilyMessage {
+  id: number;
+  to: string;
+  category: "essential" | "service" | "marketing" | "staff";
+  kind: string;
+  text: string;
+  status: "sent" | "skipped" | "failed";
+  at: string;
+}
+
+export interface MessageChoices {
+  mobile: string | null;
+  service_on: boolean;
+  broadcasts_on: boolean;
+  history: { opted_in: boolean; source: string; at: string }[];
 }

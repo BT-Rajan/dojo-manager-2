@@ -70,6 +70,8 @@ const TONES: Record<string, string> = {
   ready: "bg-success/15 text-success",
   not_ready: "bg-muted text-foreground/80",
   sent: "bg-success/15 text-success",
+  skipped: "bg-muted text-foreground/80",
+  failed: "bg-destructive/15 text-destructive",
   cancelled: "bg-destructive/15 text-destructive",
   rejected: "bg-destructive/15 text-destructive",
   absent: "bg-destructive/15 text-destructive",

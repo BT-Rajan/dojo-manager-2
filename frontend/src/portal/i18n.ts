@@ -66,3 +66,8 @@ export function kd(value: string | number, lang: Lang): string {
   const s = n.toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
   return lang === "ar" ? `${s} د.ك` : `${s} KD`;
 }
+
+/** Arabic when the page is in Arabic and an Arabic version was recorded. */
+export function ar(lang: Lang, en: string, arabic: string | null | undefined): string {
+  return lang === "ar" && arabic ? arabic : en;
+}

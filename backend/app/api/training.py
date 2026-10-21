@@ -38,7 +38,7 @@ from app.models import (
 )
 from app.schemas.common import InModel, Name, OutModel
 from app.services.audit import audit
-from app.services.bookings import contact
+from app.services.bookings import contact, display_name
 from app.services.messaging import send_message
 from app.services.progress import progress
 
@@ -377,7 +377,7 @@ async def send_progress_note(note_id: int, user: CurrentUser, db: DB) -> Progres
     if mobile:
         en, ar = NOTE_TEXT
         text = (ar if lang == "ar" else en).format(
-            member=f"{member.first_name} {member.last_name}",
+            member=display_name(member, lang),
             month=f"{note.month:%m/%Y}",
             worked_on=note.worked_on,
             next_steps=note.next_steps,

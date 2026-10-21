@@ -182,9 +182,13 @@ function UsersTab() {
 function BranchesTab() {
   const { data: branches = [] } = useBranches();
   const [open, setOpen] = useState(false);
-  const [f, setF] = useState({ name: "", code: "", address: "", phone: "" });
+  const [f, setF] = useState({ name: "", name_ar: "", code: "", address: "", phone: "" });
   const create = useApiMutation(
-    () => api("/api/branches", { method: "POST", body: { ...f, address: f.address || null, phone: f.phone || null } }),
+    () =>
+      api("/api/branches", {
+        method: "POST",
+        body: { ...f, name_ar: f.name_ar || null, address: f.address || null, phone: f.phone || null },
+      }),
     { invalidate: ["/api/branches"], success: "Branch added", onSuccess: () => setOpen(false) },
   );
   return (
@@ -224,6 +228,9 @@ function BranchesTab() {
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Name">
               <Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+            </Field>
+            <Field label="Name (Arabic)">
+              <Input dir="rtl" value={f.name_ar} onChange={(e) => setF({ ...f, name_ar: e.target.value })} />
             </Field>
             <Field label="Code (e.g. PRM)">
               <Input value={f.code} onChange={(e) => setF({ ...f, code: e.target.value.toUpperCase() })} />
@@ -473,14 +480,20 @@ function CatalogTab() {
   const { data: branches = [] } = useBranches();
   const { data: plans = [] } = useQuery<Plan[]>({ queryKey: ["/api/plans"] });
   const [open, setOpen] = useState<"program" | "plan" | null>(null);
-  const [p, setP] = useState({ name: "", discipline: "kajukenbo", min_age: "", max_age: "" });
+  const [p, setP] = useState({ name: "", name_ar: "", discipline: "kajukenbo", min_age: "", max_age: "" });
   const [plan, setPlan] = useState({ name: "", duration_days: "30", price: "" });
   const [planBranch, setPlanBranch] = useState<number | null>(null);
   const createProgram = useApiMutation(
     () =>
       api("/api/programs", {
         method: "POST",
-        body: { name: p.name, discipline: p.discipline, min_age: p.min_age ? Number(p.min_age) : null, max_age: p.max_age ? Number(p.max_age) : null },
+        body: {
+          name: p.name,
+          name_ar: p.name_ar || null,
+          discipline: p.discipline,
+          min_age: p.min_age ? Number(p.min_age) : null,
+          max_age: p.max_age ? Number(p.max_age) : null,
+        },
       }),
     { invalidate: ["/api/programs"], success: "Programme added", onSuccess: () => setOpen(null) },
   );
@@ -587,6 +600,9 @@ function CatalogTab() {
           </DialogHeader>
           <Field label="Name">
             <Input value={p.name} onChange={(e) => setP({ ...p, name: e.target.value })} />
+          </Field>
+          <Field label="Name (Arabic, shown in the member portal)">
+            <Input dir="rtl" value={p.name_ar} onChange={(e) => setP({ ...p, name_ar: e.target.value })} />
           </Field>
           <Field label="Discipline">
             <EnumSelect

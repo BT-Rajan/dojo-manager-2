@@ -56,12 +56,17 @@ gradings and seminars, front-desk operations, and inventory.
   and the monthly notes sent to the family. Families choose photo consent (internal records,
   social media, website and marketing; every change is kept) and sign the academy rules by
   typing their registered name.
+  **Account and messages**: the family list, the sign-in mobile, email, and WhatsApp choices
+  (reminders, test days and progress notes; news and offers; receipts, codes and class
+  changes are always sent), with the messages the academy sent recently. Names of members,
+  parents, branches and programmes show in Arabic on the Arabic pages when recorded.
 - **Curriculum and progress**: the Kajukenbo curriculum (215 skills in the Kickboxing,
   Jiu-Jitsu and Self-Defence & Traditional tracks, test requirements and Arabic belt names)
   is loaded for the standard belts and edited under Admin → Plans, programmes & belts (open a
   belt). Coaches and staff tick skills, add evaluations and write monthly notes on the member
   page (Progress tab); sending a note messages the family. Photo consent and signed rules
-  are shown there too.
+  are shown there too. The Messages tab lists the WhatsApp messages sent to the family and
+  their message choices, which the desk can change.
 - **Regular classes**: members can hold a regular weekly place in a timetable class (member
   page → Regular classes). Regulars count towards class capacity and appear on every class
   roster, with bookings, the waiting list and portal bookings marked.

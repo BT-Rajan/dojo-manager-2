@@ -4,7 +4,7 @@ from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from pydantic import Field, StringConstraints
+from pydantic import EmailStr, Field, StringConstraints
 
 from app.schemas.common import InModel, OutModel
 
@@ -31,6 +31,7 @@ class VerifyIn(InModel):
 class PortalMe(OutModel):
     kind: Literal["guardian", "member"]
     name: str
+    name_ar: str | None = None
     mobile: str
 
 
@@ -52,6 +53,7 @@ class ClassBrief(OutModel):
     start_time: time
     end_time: time
     title: str
+    title_ar: str | None = None
 
 
 class MembershipBrief(OutModel):
@@ -66,8 +68,11 @@ class FamilyMemberOut(OutModel):
     id: int
     first_name: str
     last_name: str
+    first_name_ar: str | None = None
+    last_name_ar: str | None = None
     branch_id: int
     branch_name: str
+    branch_name_ar: str | None = None
     branch_code: str
     rank: RankOut | None
     next_class: ClassBrief | None
@@ -82,7 +87,10 @@ class MemberHead(OutModel):
     id: int
     first_name: str
     last_name: str
+    first_name_ar: str | None = None
+    last_name_ar: str | None = None
     branch_name: str
+    branch_name_ar: str | None = None
     branch_code: str
 
 
@@ -96,6 +104,7 @@ class ClassRow(OutModel):
     start_time: time
     end_time: time
     title: str
+    title_ar: str | None = None
     regular: bool
     booking: BookingBrief | None
     can_book: bool
@@ -105,6 +114,7 @@ class AttendedRow(OutModel):
     session_date: date
     start_time: time
     title: str
+    title_ar: str | None = None
     status: str
 
 
@@ -258,6 +268,36 @@ class ConsentIn(InModel):
 class RulesIn(InModel):
     name: Annotated[str, StringConstraints(max_length=150)]
     agree: bool
+    lang: Lang = "en"
+
+
+# ---------------------------------------------------------------- account and messages
+class FamilyName(OutModel):
+    id: int
+    first_name: str
+    last_name: str
+    first_name_ar: str | None = None
+    last_name_ar: str | None = None
+
+
+class SentMessage(OutModel):
+    at: datetime
+    text: str
+
+
+class AccountOut(OutModel):
+    family: list[FamilyName]
+    email: str | None
+    mobile: str
+    service_on: bool
+    broadcasts_on: bool
+    recent: list[SentMessage]
+
+
+class AccountIn(InModel):
+    email: EmailStr | None = None
+    service: bool
+    broadcasts: bool
     lang: Lang = "en"
 
 
