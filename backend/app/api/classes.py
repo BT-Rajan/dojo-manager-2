@@ -1,6 +1,7 @@
 from datetime import date, timedelta
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import Select, case, func, select, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.orm import selectinload
@@ -26,6 +27,7 @@ from app.models import (
     ClassSession,
     Instructor,
     InstructorLeave,
+    LeaveStatus,
     Member,
     Membership,
     MembershipStatus,
@@ -38,6 +40,7 @@ from app.schemas.classes import (
     GenerateResult,
     GenerateSessionsIn,
     LeaveCreated,
+    LeaveDecisionIn,
     LeaveIn,
     LeaveOut,
     MemberAttendanceOut,
@@ -187,6 +190,7 @@ async def generate_sessions(body: GenerateSessionsIn, user: CurrentUser, db: DB)
         await db.scalars(
             select(InstructorLeave).where(
                 InstructorLeave.branch_id == body.branch_id,
+                InstructorLeave.status == LeaveStatus.APPROVED,
                 InstructorLeave.start_date <= body.date_to,
                 InstructorLeave.end_date >= body.date_from,
             )
@@ -459,32 +463,28 @@ async def member_attendance(
 
 
 # ---------------------------------------------------------------- instructor leave
-@router.get("/leaves", response_model=list[LeaveOut], dependencies=any_role)
-async def list_leaves(
-    user: CurrentUser,
-    db: DB,
-    branch_id: int | None = None,
-    instructor_id: int | None = None,
-    active_on: date | None = None,
-) -> list[InstructorLeave]:
-    stmt = scope_to_branches(select(InstructorLeave), InstructorLeave.branch_id, user, branch_id)
-    if instructor_id is not None:
-        stmt = stmt.where(InstructorLeave.instructor_id == instructor_id)
-    if active_on is not None:
-        stmt = stmt.where(
-            InstructorLeave.start_date <= active_on, InstructorLeave.end_date >= active_on
+OPEN_LEAVE = (LeaveStatus.PENDING, LeaveStatus.APPROVED)
+
+
+async def ensure_no_overlap(db: DB, instructor_id: int, first: date, last: date) -> None:
+    """One coach cannot have two pending or approved leaves on the same day."""
+    clash = await db.scalar(
+        select(InstructorLeave.id).where(
+            InstructorLeave.instructor_id == instructor_id,
+            InstructorLeave.status.in_(OPEN_LEAVE),
+            InstructorLeave.start_date <= last,
+            InstructorLeave.end_date >= first,
         )
-    return list(await db.scalars(stmt.order_by(InstructorLeave.start_date.desc())))
+    )
+    if clash is not None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Overlaps leave already requested or approved"
+        )
 
 
-@router.post("/leaves", response_model=LeaveCreated, status_code=201, dependencies=staff)
-async def create_leave(body: LeaveIn, user: CurrentUser, db: DB) -> dict:
-    """Record leave and hand the instructor's already-generated classes in that period to the
-    cover instructor (unassigned when there is no cover)."""
-    inst = await get_scoped_or_404(db, Instructor, body.instructor_id, user)
-    await _check_instructor(db, user, body.cover_instructor_id)
-    leave = InstructorLeave(**body.model_dump(), branch_id=inst.branch_id)
-    db.add(leave)
+async def hand_to_cover(db: DB, leave: InstructorLeave) -> int:
+    """Put approved leave into effect: the coach's already-generated classes in the period go
+    to the cover (unassigned when there is none). Returns how many classes moved."""
     result = await db.execute(
         update(ClassSession)
         .where(
@@ -498,14 +498,11 @@ async def create_leave(body: LeaveIn, user: CurrentUser, db: DB) -> dict:
             original_instructor_id=leave.instructor_id,
         )
     )
-    await db.commit()
-    return LeaveOut.model_validate(leave).model_dump() | {"sessions_reassigned": result.rowcount}
+    return result.rowcount
 
 
-@router.delete("/leaves/{leave_id}", status_code=204, dependencies=staff)
-async def delete_leave(leave_id: int, user: CurrentUser, db: DB) -> None:
-    """Cancel leave: classes still being covered go back to the instructor."""
-    leave = await get_scoped_or_404(db, InstructorLeave, leave_id, user)
+async def hand_back(db: DB, leave: InstructorLeave) -> None:
+    """Undo ``hand_to_cover``: classes still being covered go back to the coach."""
     await db.execute(
         update(ClassSession)
         .where(
@@ -515,5 +512,83 @@ async def delete_leave(leave_id: int, user: CurrentUser, db: DB) -> None:
         )
         .values(instructor_id=leave.instructor_id, original_instructor_id=None)
     )
+
+
+@router.get("/leaves", response_model=list[LeaveOut], dependencies=any_role)
+async def list_leaves(
+    user: CurrentUser,
+    db: DB,
+    branch_id: int | None = None,
+    instructor_id: int | None = None,
+    active_on: date | None = None,
+    leave_status: Annotated[LeaveStatus | None, Query(alias="status")] = None,
+) -> list[InstructorLeave]:
+    stmt = scope_to_branches(select(InstructorLeave), InstructorLeave.branch_id, user, branch_id)
+    if instructor_id is not None:
+        stmt = stmt.where(InstructorLeave.instructor_id == instructor_id)
+    if active_on is not None:
+        stmt = stmt.where(
+            InstructorLeave.start_date <= active_on, InstructorLeave.end_date >= active_on
+        )
+    if leave_status is not None:
+        stmt = stmt.where(InstructorLeave.status == leave_status)
+    return list(await db.scalars(stmt.order_by(InstructorLeave.start_date.desc())))
+
+
+@router.post("/leaves", response_model=LeaveCreated, status_code=201, dependencies=staff)
+async def create_leave(body: LeaveIn, user: CurrentUser, db: DB) -> dict:
+    """Record leave (approved at once) and hand the instructor's already-generated classes in
+    that period to the cover instructor (unassigned when there is no cover)."""
+    inst = await get_scoped_or_404(db, Instructor, body.instructor_id, user)
+    await _check_instructor(db, user, body.cover_instructor_id)
+    await ensure_no_overlap(db, inst.id, body.start_date, body.end_date)
+    leave = InstructorLeave(
+        **body.model_dump(),
+        branch_id=inst.branch_id,
+        status=LeaveStatus.APPROVED,
+        requested_by=user.id,
+        decided_by=user.id,
+        decided_at=utcnow(),
+    )
+    db.add(leave)
+    moved = await hand_to_cover(db, leave)
+    await db.commit()
+    await db.refresh(leave)
+    return LeaveOut.model_validate(leave).model_dump() | {"sessions_reassigned": moved}
+
+
+@router.post("/leaves/{leave_id}/decision", response_model=LeaveCreated, dependencies=staff)
+async def decide_leave(leave_id: int, body: LeaveDecisionIn, user: CurrentUser, db: DB) -> dict:
+    """Approve or reject a coach's leave request. Approving can set or change the cover."""
+    leave = await get_scoped_or_404(db, InstructorLeave, leave_id, user)
+    if leave.status != LeaveStatus.PENDING:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Leave is already {leave.status}")
+    moved = 0
+    if body.approve:
+        if "cover_instructor_id" in body.model_fields_set:
+            if body.cover_instructor_id == leave.instructor_id:
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_CONTENT, "A coach cannot cover their own leave"
+                )
+            await _check_instructor(db, user, body.cover_instructor_id)
+            leave.cover_instructor_id = body.cover_instructor_id
+        leave.status = LeaveStatus.APPROVED
+        moved = await hand_to_cover(db, leave)
+    else:
+        leave.status = LeaveStatus.REJECTED
+    leave.decided_by = user.id
+    leave.decided_at = utcnow()
+    leave.decision_note = body.note
+    await db.commit()
+    await db.refresh(leave)
+    return LeaveOut.model_validate(leave).model_dump() | {"sessions_reassigned": moved}
+
+
+@router.delete("/leaves/{leave_id}", status_code=204, dependencies=staff)
+async def delete_leave(leave_id: int, user: CurrentUser, db: DB) -> None:
+    """Remove leave: classes still being covered go back to the instructor."""
+    leave = await get_scoped_or_404(db, InstructorLeave, leave_id, user)
+    if leave.status == LeaveStatus.APPROVED:
+        await hand_back(db, leave)
     await db.delete(leave)
     await db.commit()

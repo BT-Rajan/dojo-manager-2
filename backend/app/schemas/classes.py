@@ -8,6 +8,7 @@ from app.models.classes import (
     BookingSource,
     LeadSource,
     LeadStatus,
+    LeaveStatus,
     LeaveType,
     SessionStatus,
 )
@@ -196,6 +197,36 @@ class LeaveOut(OutModel):
     type: LeaveType
     reason: str | None
     cover_instructor_id: int | None
+    status: LeaveStatus
+    requested_by: int | None
+    decided_by: int | None
+    decided_at: datetime | None
+    decision_note: str | None
+    created_at: datetime
+
+
+class LeaveRequestIn(InModel):
+    """A coach asking for leave; the cover is a suggestion the manager can change."""
+
+    start_date: date
+    end_date: date
+    type: LeaveType
+    reason: ShortText | None = None
+    cover_instructor_id: int | None = None
+
+    @model_validator(mode="after")
+    def _dates(self):
+        if self.end_date < self.start_date:
+            raise ValueError("end_date before start_date")
+        if (self.end_date - self.start_date).days > 90:
+            raise ValueError("Leave can be requested for at most 91 days at a time")
+        return self
+
+
+class LeaveDecisionIn(InModel):
+    approve: bool
+    cover_instructor_id: int | None = None
+    note: ShortText | None = None
 
 
 class LeaveCreated(LeaveOut):

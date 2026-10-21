@@ -49,6 +49,13 @@ class LeaveType(enum.StrEnum):
     OTHER = "other"
 
 
+class LeaveStatus(enum.StrEnum):
+    PENDING = "pending"  # requested by the coach, waiting for a manager
+    APPROVED = "approved"  # in effect: classes go to the cover
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"  # withdrawn by the coach before a decision
+
+
 class LeadSource(enum.StrEnum):
     WALK_IN = "walk_in"
     WHATSAPP = "whatsapp"
@@ -181,6 +188,14 @@ class InstructorLeave(TimestampMixin, Base):
     type: Mapped[LeaveType] = mapped_column(db_enum(LeaveType))
     reason: Mapped[str | None] = mapped_column(String(255))
     cover_instructor_id: Mapped[int | None] = mapped_column(ForeignKey("instructors.id"))
+    # Leave recorded by staff is approved at once; a coach's own request waits for a decision.
+    status: Mapped[LeaveStatus] = mapped_column(
+        db_enum(LeaveStatus), default=LeaveStatus.APPROVED, server_default="approved"
+    )
+    requested_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    decided_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime)
+    decision_note: Mapped[str | None] = mapped_column(String(255))
 
 
 class Lead(TimestampMixin, Base):

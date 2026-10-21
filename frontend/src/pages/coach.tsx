@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, Building2, CalendarClock, CalendarDays, Clock, Sun, Users } from "lucide-react";
+import { AlertCircle, Building2, CalendarClock, CalendarDays, CalendarOff, CalendarRange, Clock, Sun, Users } from "lucide-react";
 import { Page } from "@/components/layout/page";
 import { BeltSwatch, Empty, Loading, RecordSelect, StatCard } from "@/components/common";
 import { CoachContext, type CoachContextValue } from "@/components/coach/context";
+import { CalendarTab } from "@/components/coach/calendar-tab";
 import { ClassDayTab } from "@/components/coach/class-day-tab";
+import { LeaveTab } from "@/components/coach/leave-tab";
 import { ScheduleTab } from "@/components/coach/schedule-tab";
 import { TodayTab } from "@/components/coach/today-tab";
 import { Card, CardContent } from "@/components/ui/card";
@@ -89,6 +91,12 @@ function Portal({ value }: { value: CoachContextValue }) {
           <TabsTrigger value="schedule">
             <CalendarClock className="h-4 w-4 mr-1" aria-hidden="true" /> My schedule
           </TabsTrigger>
+          <TabsTrigger value="calendar">
+            <CalendarRange className="h-4 w-4 mr-1" aria-hidden="true" /> Calendar
+          </TabsTrigger>
+          <TabsTrigger value="leave">
+            <CalendarOff className="h-4 w-4 mr-1" aria-hidden="true" /> Leave
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="today">
           <TodayTab />
@@ -98,6 +106,12 @@ function Portal({ value }: { value: CoachContextValue }) {
         </TabsContent>
         <TabsContent value="schedule">
           <ScheduleTab />
+        </TabsContent>
+        <TabsContent value="calendar">
+          <CalendarTab />
+        </TabsContent>
+        <TabsContent value="leave">
+          <LeaveTab />
         </TabsContent>
       </Tabs>
     </CoachContext.Provider>
